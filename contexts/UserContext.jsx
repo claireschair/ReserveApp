@@ -1,9 +1,15 @@
 import { createContext, useEffect, useState } from "react";
-import { account, database } from "../lib/appwrite";
-import { ID, Query } from "react-native-appwrite";
-import { 
-  registerForPushNotificationsAsync, 
-  savePushTokenToUser 
+import { auth, db } from "../lib/firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import {
+  registerForPushNotificationsAsync,
+  savePushTokenToUser,
 } from "../notificationService";
 
 export const UserContext = createContext();
@@ -12,94 +18,77 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  async function login(email, password) {
+  // Listen to Firebase auth state changes (replaces getInitialUserValue polling)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        await loadUserProfile(firebaseUser);
+      } else {
+        setUser(null);
+      }
+      setAuthChecked(true);
+    });
+
+    return () => unsubscribe(); // cleanup on unmount
+  }, []);
+
+  async function loadUserProfile(firebaseUser) {
     try {
-      await account.deleteSession("current");
-    } catch {}
-    await account.createEmailPasswordSession(email, password);
-    await getInitialUserValue();
+      const docRef = doc(db, "users", firebaseUser.uid);
+      const docSnap = await getDoc(docRef);
+      const profile = docSnap.exists() ? docSnap.data() : {};
+      setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...profile });
+    } catch (err) {
+      console.error("Error loading user profile:", err);
+      setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+    }
+  }
+
+  async function login(email, password) {
+    await signInWithEmailAndPassword(auth, email, password);
+    // onAuthStateChanged will handle setting the user
   }
 
   async function register(email, password, name, label) {
-    const newUser = await account.create(ID.unique(), email, password, name);
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    const uid = credential.user.uid;
 
-    await database.createDocument(
-      process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
-      process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID,
-      ID.unique(),
-      {
-        userID: newUser.$id,
-        name,
-        email,
-        label,
-      }
-    );
+    // Store extra profile info in Firestore (Firebase Auth only stores email/password)
+    await setDoc(doc(db, "users", uid), {
+      uid,
+      name,
+      email,
+      label,
+    });
 
-    await login(email, password);
+    // onAuthStateChanged fires automatically after createUserWithEmailAndPassword
   }
 
   async function logout() {
-    await account.deleteSession("current");
+    await signOut(auth);
     setUser(null);
   }
 
-  async function getInitialUserValue() {
-    try {
-      const authUser = await account.get();
-
-      const profile = await database.listDocuments(
-        process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
-        process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID,
-        [Query.equal("userID", authUser.$id)]
-      );
-
-      setUser({ ...authUser, ...(profile.documents[0] || {}) });
-    } catch {
-      setUser(null);
-    } finally {
-      setAuthChecked(true);
-    }
-  }
-
+  // Push notifications
   useEffect(() => {
-    getInitialUserValue();
-  }, []);
-
-  useEffect(() => {
-    if (user && user.$id) {
+    if (user?.uid) {
       setupPushNotifications();
     }
-  }, [user]);
+  }, [user?.uid]);
 
   async function setupPushNotifications() {
     try {
-      console.log('Setting up push notifications...');
-      console.log('Current user object:', user ? {
-        id: user.$id,
-        userID: user.userID,
-        email: user.email
-      } : 'No user');
-      
       const token = await registerForPushNotificationsAsync();
-      console.log('Got push token:', token ? `${token.substring(0, 30)}...` : 'No token');
-      
       if (token && user) {
-        const authUserId = user.userID || user.$id;
-        console.log('Using authUserId:', authUserId);
-        await savePushTokenToUser(authUserId, token);
-        console.log('Push notifications registered successfully');
-      } else {
-        console.log('Cannot setup push notifications:', { hasToken: !!token, hasUser: !!user });
+        await savePushTokenToUser(user.uid, token);
       }
     } catch (err) {
-      console.error('Error setting up push notifications:', err);
+      console.error("Error setting up push notifications:", err);
     }
   }
 
   return (
-    <UserContext.Provider
-      value={{ user, authChecked, login, logout, register }}
-    >
+    <UserContext.Provider value={{ user, authChecked, login, logout, register }}>
       {children}
     </UserContext.Provider>
   );
