@@ -10,7 +10,7 @@ import ThemedButton from '../../components/ThemedButton'
 import ThemedTextInput from "../../components/ThemedTextInput"
 import { useUser } from '../../hooks/useUser'
 
-const LABEL_OPTIONS = ['Teacher', 'Student', 'Other'];
+const LABEL_OPTIONS = ['Teacher', 'Parent'];
 
 const Register = () => {
   const [email, setEmail] = useState("")
@@ -19,16 +19,20 @@ const Register = () => {
   const [error, setError] = useState()
   const [label, setLabel] = useState("")
   const [dropdownOpen, setDropdownOpen] = useState(false)
-
+  const [isAdult, setIsAdult] = useState("")
   const {register} = useUser()
 
   const handleSubmit = async () => {
     setError(null)
     
     if (!label) {
-      setError("Please select your role (Teacher/Student/Other)")
+      setError("Please select your role (Teacher/Parent)")
       return
     }
+    if (!isAdult) {
+      setError("You must be 18 or older to use this service")
+    return
+  }
     
     try {
       await register(email, password, name, label.toLowerCase())
@@ -98,6 +102,7 @@ const Register = () => {
           </View>
         )}
       </View>
+      
 
       <ThemedTextInput
         style={styles.input}
@@ -114,6 +119,15 @@ const Register = () => {
         onChangeText={setPassword}
         secureTextEntry
       />
+      <TouchableOpacity 
+        style={styles.checkboxRow} 
+        onPress={() => setIsAdult(!isAdult)}
+      >
+        <View style={[styles.checkbox, isAdult && styles.checkboxChecked]}>
+          {isAdult && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+        <ThemedText style={styles.checkboxLabel}>I am 18 years of age or older</ThemedText>
+      </TouchableOpacity>
 
       <ThemedButton onPress={handleSubmit} style={styles.registerButton}>
         <Text style={{ color: "#f2f2f2" }}>Register</Text>
@@ -262,5 +276,35 @@ const styles = StyleSheet.create({
   selectedOptionText: {
     fontWeight: "600",
     color: "#4A90E2",
+  },
+  checkboxRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  width: "90%",
+  marginBottom: 18,
+},
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#e0e7ff",
+    backgroundColor: "#F3F6FB",
+    marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: "#4A90E2",
+    borderColor: "#4A90E2",
+  },
+  checkmark: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    flex: 1,
   },
 });
