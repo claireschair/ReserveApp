@@ -311,9 +311,15 @@ const DonationList = () => {
   return (
     <ThemedView style={styles.container}>
       <Spacer height={70} />
+      <View style={styles.headerCard}>
       <ThemedText title style={styles.heading}>
         My Donations
       </ThemedText>
+
+      <ThemedText style={styles.subtitle}>
+        View your past and current donations!
+      </ThemedText>
+      </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -637,10 +643,37 @@ const DonationList = () => {
 export default DonationList;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 15 },
+  container: { 
+    flex: 1,
+    padding: 16,
+    backgroundColor: "#dee6ff",
+  },
   heading: { 
-    fontSize: 30, fontWeight: "bold", textAlign: "center",
-    paddingBottom: 30, 
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 5, 
+    color: "white",
+  },
+  headerCard: {
+    backgroundColor: "#699cea",
+    paddingVertical: 22,
+    paddingHorizontal: 32,
+    borderRadius: 30,
+    alignSelf: "center",
+    marginBottom: 25,
+
+    shadowColor: "#4F7BFF",
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  subtitle: {
+    fontSize: 15,
+    textAlign: "center",
+    color: "#e2f0ff",
+    lineHeight: 22,
   },
   searchContainer: {
     flexDirection: "row",
@@ -651,11 +684,11 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     backgroundColor: "white",
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "#ccc",
+    borderRadius: 25,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderWidth: 2,
+    borderColor: "#ddd",
     color: "#000",
   },
   filterButton: {
@@ -669,10 +702,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   filtersContainer: {
-    backgroundColor: "#f5f5f5",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
+    backgroundColor: "white",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 12,
   },
   filterRow: {
     flexDirection: "row",
@@ -706,12 +739,12 @@ const styles = StyleSheet.create({
   },
   dropdownWrapper: { alignItems: "center", marginBottom: 10, zIndex: 1000 },
   dropdownButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#ccc",
     backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   dropdownMenu: {
     marginTop: 5,
@@ -726,10 +759,16 @@ const styles = StyleSheet.create({
   dropdownItem: { padding: 10, alignItems: "center" },
   dropdownActiveText: { fontWeight: "bold", color: "#007AFF" },
   donationCard: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "white",
     padding: 15,
-    borderRadius: 12,
+    borderRadius: 18,
     marginBottom: 20,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   donationTitle: { fontWeight: "bold", fontSize: 16 },
   donationHeader: {
@@ -763,12 +802,10 @@ const styles = StyleSheet.create({
   },
   noMatch: { color: "#777", fontStyle: "italic", marginTop: 8 },
   matchCard: {
-    backgroundColor: "white",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
+    backgroundColor: "#f8fbff",
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 10,
   },
   pendingTitle: {
     fontWeight: "bold",
@@ -786,12 +823,12 @@ const styles = StyleSheet.create({
     color: "#2196F3",
   },
   contactCard: {
-    backgroundColor: "#E8F5E9",
+    backgroundColor: "#f0f7ff",
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: "#4CAF50",
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#4A90E2",
   },
   contactHeader: {
     flexDirection: "row",
@@ -893,7 +930,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  modalContent: { backgroundColor: "white", borderRadius: 10, padding: 20 },
+  modalContent: { 
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    width: "85%", 
+  },
   modalHint: { fontSize: 14, color: "#666", marginBottom: 10 },
   input: {
     borderWidth: 1,

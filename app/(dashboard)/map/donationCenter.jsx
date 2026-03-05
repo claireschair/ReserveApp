@@ -75,6 +75,9 @@ const SelectDonationLocation = () => {
             setLocation({ latitude, longitude });
           }}
         />
+        <ThemedText style={styles.subtitle}>
+          Select a location on the map and list items accepted
+        </ThemedText>
       </View>
 
       <MapView
@@ -95,7 +98,13 @@ const SelectDonationLocation = () => {
         <ThemedText style={styles.label}>
           Items Accepted (Optional):
         </ThemedText>
-        <Spacer height={8} />
+        <Spacer height={4} />
+        {placeName && (
+            <ThemedText style={styles.locationText}>
+              📍 {placeName}
+            </ThemedText>
+          )}
+        <Spacer height={3} />
 
         <View style={styles.itemInputWrapper}>
           <TextInput
@@ -153,17 +162,30 @@ const styles = StyleSheet.create({
   },
   searchOverlay: {
     position: "absolute",
-    top: 50,
-    left: 16,
-    right: 16,
+    top: 70,
+    left: 20,
+    right: 20,
     zIndex: 1000,
   },
   map: {
     flex: 1,
   },
   form: {
-    padding: 16,
-    backgroundColor: "white",
+    position: "absolute",
+    bottom: 20,
+    left: 16,
+    right: 16,
+
+    backgroundColor: "#ffffff",
+    paddingVertical: 22,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+
+    shadowColor: "#4A90E2",
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   label: {
     fontSize: 14,
@@ -175,22 +197,23 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   input: {
-    padding: 12,
-    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: "#F3F6FB",
     borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "white",
-    fontSize: 16,
-    color: "#111",
+    borderColor: "#e0e7ff",
+    fontSize: 15,
   },
   itemInput: {
     flex: 1,
   },
   addButton: {
-    backgroundColor: "#4F46E5",
-    paddingHorizontal: 20,
+    backgroundColor: "#4A90E2",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     justifyContent: "center",
-    borderRadius: 10,
+    borderRadius: 20,
   },
   addButtonText: {
     color: "white",
@@ -205,7 +228,7 @@ const styles = StyleSheet.create({
   itemChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#E0E7FF",
+    backgroundColor: "#E8F1FF",
     borderRadius: 20,
     paddingVertical: 6,
     paddingLeft: 12,
@@ -214,26 +237,40 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 14,
-    color: "#4F46E5",
+    color: "#4A90E2",
   },
   removeButton: {
     fontSize: 16,
-    color: "#4F46E5",
+    color: "#4A90E2",
     fontWeight: "bold",
   },
   button: {
-    backgroundColor: "#4F46E5",
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: "#4488d6",
+    paddingVertical: 14,
+    borderRadius: 22,
+    marginTop: 8,
   },
   buttonText: {
     color: "white",
-    fontWeight: "bold",
+    fontWeight: "600",
     textAlign: "center",
+    fontSize: 16,
   },
   error: {
     color: "red",
     marginTop: 8,
     textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    opacity: 0.8,
+    marginBottom: 10,
+    marginTop: 5,
+    marginLeft: 3,
+  },
+  locationText: {
+    marginBottom: 10,
+    fontWeight: "600",
+    color: "#1f2937",
   },
 });
