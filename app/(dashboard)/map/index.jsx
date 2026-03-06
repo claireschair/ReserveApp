@@ -1,7 +1,9 @@
-import { StyleSheet, TouchableOpacity } from "react-native";
+import { StyleSheet, TouchableOpacity, View} from "react-native";
 import { useEffect, useState } from "react";
 import MapView, { Marker } from "react-native-maps";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import Spacer from "../../../components/Spacer";
 
 import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
@@ -56,6 +58,15 @@ const Map = () => {
           />
         ))}
       </MapView>
+      
+        <View style={styles.floatingHeader}>
+          <ThemedText style={styles.headerTitle}>
+            Nearby Donation Centers
+          </ThemedText>
+          <ThemedText style={styles.headerSubtitle}>
+            Find where to donate or pick up school supplies
+          </ThemedText>
+        </View>
 
       {selectedCenter && (
         <TouchableOpacity
@@ -67,7 +78,12 @@ const Map = () => {
             {selectedCenter.name}
           </ThemedText>
 
-          <ThemedText>
+          <ThemedText
+            style={[
+              styles.statusBadge,
+              { backgroundColor: selectedCenter.verified ? "#51db83" : "#f47474" },
+            ]}
+          >
             {selectedCenter.verified ? "Verified" : "Unverified"}
           </ThemedText>
 
@@ -75,7 +91,10 @@ const Map = () => {
 
           {selectedCenter.items?.length ? (
             selectedCenter.items.map((item, idx) => (
-              <ThemedText key={idx}>• {item}</ThemedText>
+              <View key={idx} style={styles.itemRow}>
+                <Ionicons name="cube-outline" size={16} color="#4A90E2" />
+                <ThemedText style={styles.itemText}>{item}</ThemedText>
+              </View>
             ))
           ) : (
             <ThemedText>No items listed</ThemedText>
@@ -103,13 +122,22 @@ const styles = StyleSheet.create({
 
   addButton: {
     position: "absolute",
-    bottom: 30,
-    alignSelf: "center",
-    backgroundColor: "#2065b4",
+    bottom: 40,
+    alignSelf: "center",         
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(90, 167, 255, 0.9)",   
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    elevation: 5,
+    paddingVertical: 14,
+    borderRadius: 35,           
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: "#5874ce",
   },
 
   addButtonText: {
@@ -118,13 +146,17 @@ const styles = StyleSheet.create({
   },
   detailsCard: {
     position: "absolute",
-    bottom: 90,
-    left: 16,
-    right: 16,
+    bottom: 100,
+    left: 20,
+    right: 20,
     backgroundColor: "white",
-    padding: 16,
-    borderRadius: 16,
-    elevation: 6,
+    padding: 18,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
   centerTitle: {
     fontSize: 18,
@@ -141,5 +173,56 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: "right",
     color: "#4F46E5",
+  },
+  statusBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    color: "white",
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+
+  itemText: {
+    marginLeft: 6,
+  },
+  floatingHeader: {
+    marginTop: 25,
+    position: "absolute",
+    top: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(46, 134, 235, 0.9)", 
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+    borderWidth: 1.5,
+    borderColor: "#243a80",
+  },  
+
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "white",
+    textAlign: "center",
+  },
+
+  headerSubtitle: {
+    fontSize: 14,
+    color: "white",
+    textAlign: "center",
+    marginTop: 4,
   },
 });

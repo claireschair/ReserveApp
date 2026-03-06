@@ -279,7 +279,15 @@ const RequestList = () => {
   return (
     <ThemedView style={styles.container}>
       <Spacer height={70} />
-      <ThemedText title style={styles.heading}>Request Matches</ThemedText>
+      <View style={styles.headerCard}>
+      <ThemedText title style={styles.heading}>
+        Request Matches
+      </ThemedText>
+
+      <ThemedText style={styles.subtitle}>
+        See donors who match your requests!
+      </ThemedText>
+      </View>
 
       <View style={styles.searchContainer}>
         <TextInput
@@ -544,24 +552,76 @@ const RequestList = () => {
 export default RequestList;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 15 },
-  heading: { fontSize: 30, fontWeight: "bold", textAlign: "center", paddingBottom: 30 },
-  searchContainer: { flexDirection: "row", alignItems: "center", marginBottom: 20, gap: 8 },
+  container: { flex: 1, padding: 15, backgroundColor: "#dee6ff"},
+  heading: { 
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 5,
+    color: "white",
+  },
+  headerCard: {
+    backgroundColor: "#699cea",
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    alignSelf: "center",
+    marginBottom: 25,
+
+    shadowColor: "#4F7BFF",
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  subtitle: {
+    fontSize: 15,
+    textAlign: "center",
+    color: "#e2f0ff",
+    lineHeight: 22,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    gap: 8,
+  },
   searchInput: {
     flex: 1,
     backgroundColor: "white",
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    borderRadius: 25,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#ccc",
-    color: "#000",
+    borderColor: "#ddd",
+    //width: '70%',
   },
-  filterButton: { backgroundColor: "#4A90E2", paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
-  filterButtonText: { color: "white", fontWeight: "bold" },
-  filtersContainer: { backgroundColor: "#f5f5f5", padding: 12, borderRadius: 12, marginBottom: 10 },
-  filterRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  filterLabel: { fontSize: 14, marginRight: 10, width: 80 },
+  filterButton: {
+    backgroundColor: "#4A90E2",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  filterButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  filtersContainer: {
+    backgroundColor: "#f5f5f5",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  filterLabel: {
+    fontSize: 14,
+    marginRight: 10,
+    width: 80,
+  },
   filterInput: {
     flex: 1,
     backgroundColor: "white",
@@ -576,12 +636,12 @@ const styles = StyleSheet.create({
   clearButtonText: { color: "white", fontWeight: "bold" },
   dropdownWrapper: { alignItems: "center", marginBottom: 10, zIndex: 1000 },
   dropdownButton: {
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#ccc",
     backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   dropdownMenu: {
     marginTop: 5,
@@ -595,7 +655,18 @@ const styles = StyleSheet.create({
   },
   dropdownItem: { padding: 10, alignItems: "center" },
   dropdownActiveText: { fontWeight: "bold", color: "#007AFF" },
-  requestCard: { backgroundColor: "#f5f5f5", padding: 15, borderRadius: 12, marginBottom: 20 },
+  requestCard: {
+    backgroundColor: "white",
+  padding: 18,
+  borderRadius: 18,
+  marginBottom: 20,
+
+  shadowColor: "#000",
+  shadowOpacity: 0.08,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 4,
+  },
   requestTitle: { fontWeight: "bold", fontSize: 16 },
   requestHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   requestHeaderText: { flex: 1 },
@@ -642,14 +713,24 @@ const styles = StyleSheet.create({
   selectButton: {
     marginTop: 5,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#007AFF",
     backgroundColor: "#E0F0FF",
     alignItems: "center",
   },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 },
-  modalContent: { backgroundColor: "white", borderRadius: 10, padding: 20 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: { 
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    width: "85%", 
+  },
   modalHint: { fontSize: 14, color: "#666", marginBottom: 10 },
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },
 });
