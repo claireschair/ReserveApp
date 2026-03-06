@@ -1,14 +1,12 @@
 import { StyleSheet, ScrollView, TouchableOpacity, Linking, View } from 'react-native';
 import { useState, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+import { Ionicons } from '@expo/vector-icons';
 
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
-import { database } from '../../../lib/appwrite';
-import { Ionicons } from '@expo/vector-icons';
-
-const WISHLIST_DB_ID = "6944caa80022e2cfa289";
-const WISHLIST_COLLECTION_ID = "teacher_wishlists";
 
 const Wishlist = () => {
   const [wishlists, setWishlists] = useState([]);
@@ -22,13 +20,16 @@ const Wishlist = () => {
   const loadWishlists = async () => {
     try {
       setLoading(true);
-      const response = await database.listDocuments(
-        WISHLIST_DB_ID,
-        WISHLIST_COLLECTION_ID
-      );
+      setError(null);
+      
+      const querySnapshot = await getDocs(collection(db, 'teacher_wishlists'));
+      const wishlistsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
       
       // Shuffle the wishlists randomly
-      const shuffled = response.documents.sort(() => Math.random() - 0.5);
+      const shuffled = wishlistsData.sort(() => Math.random() - 0.5);
       setWishlists(shuffled);
     } catch (err) {
       console.error("Error loading wishlists:", err);
@@ -50,6 +51,7 @@ const Wishlist = () => {
   if (loading) {
     return (
       <ThemedView style={styles.container}>
+        <Spacer height={70} />
         <ThemedText>Loading wishlists...</ThemedText>
       </ThemedView>
     );
@@ -58,6 +60,7 @@ const Wishlist = () => {
   if (error) {
     return (
       <ThemedView style={styles.container}>
+        <Spacer height={70} />
         <ThemedText style={styles.error}>{error}</ThemedText>
         <Spacer height={20} />
         <TouchableOpacity style={styles.retryButton} onPress={loadWishlists}>
@@ -71,15 +74,14 @@ const Wishlist = () => {
     <ThemedView style={styles.pageContainer}>
       <Spacer height={70} />
       <View style={styles.headerCard}>
-      <ThemedText style={styles.heading}>
-       Teachers' Wishlists
-       </ThemedText>
-      <Spacer height={2} />
-      <ThemedText style={styles.subtitle}>
-       Support classrooms by donating needed supplies 
-      </ThemedText>
+        <ThemedText style={styles.heading}>
+          Teachers' Wishlists
+        </ThemedText>
+        <Spacer height={2} />
+        <ThemedText style={styles.subtitle}>
+          Support classrooms by donating needed supplies 
+        </ThemedText>
       </View>
-      
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {wishlists.length === 0 ? (
@@ -93,45 +95,48 @@ const Wishlist = () => {
             </ThemedText>
           </View>
         ) : (
-          wishlists.map((wishlist, index) => {
-            // Handle items - use capitalized field names from Appwrite
-            const itemsArray = Array.isArray(wishlist.Items) 
-              ? wishlist.Items 
+          wishlists.map((wishlist) => {
+            // Handle items array
+            const itemsArray = Array.isArray(wishlist.items) 
+              ? wishlist.items 
               : [];
             
             return (
-            <View key={wishlist.$id} style={styles.wishlistCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.profileCircle}>
-                <Ionicons name="school" size={18} color="#4F7BFF" /></View>
-                <ThemedText style={styles.teacherName}>{wishlist.Name || "Anonymous Teacher"}</ThemedText>
-              </View>
-
-              <Spacer height={10} />
-
-              {itemsArray.length > 0 && (
-                <>
-                  <ThemedText style={styles.sectionLabel}>Items Requested:</ThemedText>
-                  <View style={styles.itemsContainer}>
-                    {itemsArray.map((item, idx) => (
-                      <View key={idx} style={styles.itemChip}>
-                        <ThemedText style={styles.itemText}>• {item}</ThemedText>
-                      </View>
-                    ))}
+              <View key={wishlist.id} style={styles.wishlistCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.profileCircle}>
+                    <Ionicons name="school" size={18} color="#4F7BFF" />
                   </View>
-                  <Spacer height={15} />
-                </>
-              )}
+                  <ThemedText style={styles.teacherName}>
+                    {wishlist.name || "Anonymous Teacher"}
+                  </ThemedText>
+                </View>
 
-              <TouchableOpacity
-                style={styles.amazonButton}
-                onPress={() => openAmazonLink(wishlist.amazonLink)}
-              >
-                <ThemedText style={styles.amazonButtonText}>
-                  View Amazon Wishlist →
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
+                <Spacer height={10} />
+
+                {itemsArray.length > 0 && (
+                  <>
+                    <ThemedText style={styles.sectionLabel}>Items Requested:</ThemedText>
+                    <View style={styles.itemsContainer}>
+                      {itemsArray.map((item, idx) => (
+                        <View key={idx} style={styles.itemChip}>
+                          <ThemedText style={styles.itemText}>• {item}</ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                    <Spacer height={15} />
+                  </>
+                )}
+
+                <TouchableOpacity
+                  style={styles.amazonButton}
+                  onPress={() => openAmazonLink(wishlist.amazonLink)}
+                >
+                  <ThemedText style={styles.amazonButtonText}>
+                    View Amazon Wishlist →
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             );
           })
         )}
@@ -163,8 +168,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 35,
     width: "90%",
-    //height: "15%",
-
     shadowColor: "#4F7BFF",
     shadowOpacity: 0.12,
     shadowRadius: 20,
@@ -282,13 +285,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   profileCircle: {
-  width: 38,
-  height: 38,
-  borderRadius: 19,
-  backgroundColor: "#E8F1FF",
-  justifyContent: "center",
-  alignItems: "center",
-  borderWidth: 1,
-  borderColor: "#aac2f2",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#E8F1FF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#aac2f2",
   },
 });

@@ -1,6 +1,5 @@
 import { StyleSheet, View, Image, Dimensions, Text, TouchableOpacity, ActivityIndicator, Alert, Switch, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { database } from '../../../lib/appwrite';
 import React, { useEffect, useState } from 'react';
 import { 
   updateNotificationPreference, 
@@ -16,53 +15,47 @@ import ThemedLogo from '../../../components/ThemedLogo';
 import ThemedButton from "../../../components/ThemedButton";
 import Spacer from "../../../components/Spacer";
 
-
 const { width } = Dimensions.get('window');
 
 const Profile = () => {
   const router = useRouter(); 
   const { logout, user, authChecked } = useUser();
   const [notif, setNotif] = useState(true);
-const [loadingNotif, setLoadingNotif] = useState(false);
+  const [loadingNotif, setLoadingNotif] = useState(false);
 
-useEffect(() => {
-  loadNotificationPreference();
-}, [user]);
+  useEffect(() => {
+    loadNotificationPreference();
+  }, [user?.uid]);
 
-const loadNotificationPreference = async () => {
-  if (user) {
-    const authUserId = user.userID || user.$id;
-    const enabled = await getNotificationPreference(authUserId);
-    setNotif(enabled);
-  }
-};
+  const loadNotificationPreference = async () => {
+    if (!user?.uid) return;
 
-const handleNotificationToggle = async (value) => {
-  if (!user) return;
+    try {
+      const enabled = await getNotificationPreference(user.uid);
+      setNotif(enabled);
+    } catch (err) {
+      console.error('Error loading notification preference:', err);
+      setNotif(true);
+    }
+  };
 
-  setLoadingNotif(true);
-  setNotif(value);
+  const handleNotificationToggle = async (value) => {
+    if (!user?.uid) return;
 
-  try {
-    const authUserId = user.userID || user.$id;
-    const success = await updateNotificationPreference(authUserId, value);
+    setLoadingNotif(true);
+    setNotif(value);
 
-    if (!success) {
+    try {
+      await updateNotificationPreference(user.uid, value);
+      Alert.alert('Success', `Notifications ${value ? 'enabled' : 'disabled'} successfully.`);
+    } catch (err) {
+      console.error('Error updating notifications:', err);
       setNotif(!value);
       Alert.alert('Error', 'Failed to update notification settings.');
+    } finally {
+      setLoadingNotif(false);
     }
-  } catch (err) {
-    console.error(err);
-    setNotif(!value);
-    Alert.alert('Error', 'Failed to update notification settings.');
-  } finally {
-    setLoadingNotif(false);
-  }
-};
-  async function fetchUserLabel(userId) {
-    const doc = await database.getDocument("users", userId);
-    return doc.label;
-  }
+  };
 
   if (!authChecked) {
     return (
@@ -102,30 +95,27 @@ const handleNotificationToggle = async (value) => {
           {user.name}
         </ThemedText>
         
-
         <Spacer height={5} />
         <ThemedText title style={styles.subheading}>
-          {user.label}
+          {user.label === 'teacher' ? 'Teacher' : 'Parent'}
         </ThemedText>
 
         <Spacer height={5} />
-
       </View>
 
-      
       <View style={styles.rowButtons}>
         <ThemedButton 
           style={[styles.button, { backgroundColor: '#415ba8ff' }]} 
-         onPress={() => router.push('/(dashboard)/receive/requestlist')}
+          onPress={() => router.push('/(dashboard)/receive/requestlist')}
         >
-         <Text style={[styles.buttonText, { color: '#f2f2f2' }]}>Requests</Text>
+          <Text style={[styles.buttonText, { color: '#f2f2f2' }]}>Requests</Text>
         </ThemedButton>
 
         <ThemedButton 
-         style={[styles.button, { backgroundColor: '#f2f2f2', borderWidth: 2, borderColor: '#415ba8ff' }]} 
-        onPress={() => router.push('/(dashboard)/donate/donationlist')}
+          style={[styles.button, { backgroundColor: '#f2f2f2', borderWidth: 2, borderColor: '#415ba8ff' }]} 
+          onPress={() => router.push('/(dashboard)/donate/donationlist')}
         >
-         <Text style={[styles.buttonText, { color: '#415ba8ff' }]}>Donations</Text>
+          <Text style={[styles.buttonText, { color: '#415ba8ff' }]}>Donations</Text>
         </ThemedButton>
       </View>
 
@@ -133,44 +123,41 @@ const handleNotificationToggle = async (value) => {
         <Text style={styles.buttonText}>Wishlist</Text>
       </ThemedButton>
       <Spacer height={10} />
-      
-      
 
       <Spacer height={25} />
 
       <View style={styles.settingsContainer}>
-
         <View style={styles.card}>
           <SettingsRow
-              icon="notifications-outline"
-              label="Notifications"
-              showSwitch
-              switchValue={notif}
-              onSwitchChange={handleNotificationToggle}
-              loading={loadingNotif} 
-            />
+            icon="notifications-outline"
+            label="Notifications"
+            showSwitch
+            switchValue={notif}
+            onSwitchChange={handleNotificationToggle}
+            loading={loadingNotif} 
+          />
           <SettingsRow
             icon="document-text-outline"
             label="Terms & Conditions"
-            onPress={() => router.push('/(dashboard)/profile/settings/terms')}
+            onPress={() => router.push('/(dashboard)/profile/terms')}
           />
       
           <SettingsRow
             icon="lock-closed-outline"
             label="Privacy Policy"
-            onPress={() => router.push('/(dashboard)/profile/settings/privacy')}
+            onPress={() => router.push('/(dashboard)/profile/privacy')}
           />
       
           <SettingsRow
             icon="chatbubble-ellipses-outline"
             label="Feedback"
-            onPress={() => router.push('/(dashboard)/profile/settings/feedback')}
+            onPress={() => router.push('/(dashboard)/profile/feedback')}
           />
       
           <SettingsRow
             icon="mail-outline"
             label="Contact Us"
-            onPress={() => router.push('/(dashboard)/profile/settings/contact')}
+            onPress={() => router.push('/(dashboard)/profile/contact')}
           />
         </View>
       
@@ -182,10 +169,8 @@ const handleNotificationToggle = async (value) => {
             onPress={logout}
           />
         </View>
-
       </View>
       <Spacer height={100} />
-
     </ScrollView>
   );
 };
@@ -244,13 +229,20 @@ const SettingsRow = ({
 export default Profile;
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+
   container: { flex: 1},
 
   topBackground: {
     position: "absolute",
     top: 0,
     width: "100%",
-    height: "30%", //top half is blue
+    height: "30%",
     backgroundColor: "#4A90E2",
     zIndex: 0,
   },
@@ -263,14 +255,17 @@ const styles = StyleSheet.create({
     zIndex: 1,
     backgroundColor: '#bcd7f5ff', 
   },
+
   scrollView:{
     flex:1,
     backgroundColor: "#4A90E2",
   },
+
   scrollContent: {
     flexGrow: 1,
     backgroundColor: '#f8f9fa',
   },
+
   header: {
     width: '100%',
     alignItems: 'center',
@@ -315,7 +310,7 @@ const styles = StyleSheet.create({
     marginTop: 4,       
     zIndex: 1,
     maxWidth: "65%"
-},
+  },
 
   button: {
     width: "50%",
@@ -340,9 +335,7 @@ const styles = StyleSheet.create({
     color: '#f2f2f2',
     fontSize: 18,   
     fontWeight: '600',
-},
-
-  // specialized buttons
+  },
 
   settingsButton: {
     position: 'absolute',
@@ -369,54 +362,52 @@ const styles = StyleSheet.create({
   },
 
   settingsContainer: {
-  width: '90%',
-  alignSelf: 'center',
-  marginTop: 10,
-},
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 10,
+  },
 
-card: {
-  backgroundColor: '#fff',
-  borderRadius: 18,
-  marginBottom: 20,
-  paddingVertical: 5,
-  shadowColor: '#000',
-  shadowOpacity: 0.05,
-  shadowRadius: 5,
-  elevation: 3,
-},
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    marginBottom: 20,
+    paddingVertical: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
+  },
 
-row: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  paddingVertical: 15,
-  paddingHorizontal: 18,
-  borderBottomWidth: 1,
-  borderBottomColor: '#f1f1f1',
-},
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f1f1',
+  },
 
-rowLeft: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 12,
-},
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
 
-rowLabel: {
-  fontSize: 16,
-  fontWeight: '500',
-  color: '#333',
-},
+  rowLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
 
-rowRight: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 6,
-},
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
 
-rowValue: {
-  fontSize: 14,
-  color: '#999',
-},
-
+  rowValue: {
+    fontSize: 14,
+    color: '#999',
+  },
 });
-

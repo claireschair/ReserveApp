@@ -1,30 +1,39 @@
 import { createContext, useContext } from "react";
-import { database } from "../lib/appwrite";
-import { ID } from "react-native-appwrite";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import { UserContext } from "./UserContext";
 
 export const WishlistContext = createContext();
 
-const WISHLIST_DB_ID = "6944caa80022e2cfa289";
-const WISHLIST_COLLECTION_ID = "teacher_wishlists";
-
 export function WishlistProvider({ children }) {
   const { user } = useContext(UserContext);
-  const userId = user?.$id ?? null;
 
-  async function saveWishlist(name, amazonLink, items = "") {
-    if (!user) throw new Error("User not logged in");
+  async function saveWishlist(name, amazonLink, items = []) {
+    if (!user?.uid) {
+      throw new Error("User not logged in");
+    }
 
-    return await database.createDocument(
-      WISHLIST_DB_ID,
-      WISHLIST_COLLECTION_ID,
-      ID.unique(),
-      { 
-        Name: name, 
-        amazonLink,
-        Items: items
-      }
-    );
+    // Convert items to array if it's a string
+    const itemsArray = typeof items === 'string' 
+      ? items.split(',').map(item => item.trim()).filter(Boolean)
+      : Array.isArray(items) 
+        ? items 
+        : [];
+
+    try {
+      const docRef = await addDoc(collection(db, 'teacher_wishlists'), {
+        userId: user.uid,
+        name: name || user.name || "Anonymous Teacher",
+        amazonLink: amazonLink,
+        items: itemsArray,
+        createdAt: Timestamp.now(),
+      });
+
+      return { id: docRef.id };
+    } catch (err) {
+      console.error("Error saving wishlist:", err);
+      throw err;
+    }
   }
 
   return (

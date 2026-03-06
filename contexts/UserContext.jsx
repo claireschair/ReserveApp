@@ -6,7 +6,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
 import {
   registerForPushNotificationsAsync,
   savePushTokenToUser,
@@ -18,7 +18,7 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Listen to Firebase auth state changes (replaces getInitialUserValue polling)
+  // Listen to Firebase auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -29,7 +29,7 @@ export function UserProvider({ children }) {
       setAuthChecked(true);
     });
 
-    return () => unsubscribe(); // cleanup on unmount
+    return () => unsubscribe();
   }, []);
 
   async function loadUserProfile(firebaseUser) {
@@ -46,22 +46,21 @@ export function UserProvider({ children }) {
 
   async function login(email, password) {
     await signInWithEmailAndPassword(auth, email, password);
-    // onAuthStateChanged will handle setting the user
   }
 
   async function register(email, password, name, label) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     const uid = credential.user.uid;
 
-    // Store extra profile info in Firestore (Firebase Auth only stores email/password)
     await setDoc(doc(db, "users", uid), {
       uid,
       name,
       email,
       label,
+      pushToken: null,
+      notificationsEnabled: true,
+      createdAt: Timestamp.now(),
     });
-
-    // onAuthStateChanged fires automatically after createUserWithEmailAndPassword
   }
 
   async function logout() {

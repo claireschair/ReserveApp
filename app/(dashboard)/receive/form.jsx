@@ -1,4 +1,13 @@
-import { StyleSheet, TouchableOpacity, Keyboard, ScrollView, View, TouchableWithoutFeedback, Alert, TextInput } from "react-native";
+import {
+  StyleSheet,
+  TouchableOpacity,
+  Keyboard,
+  ScrollView,
+  View,
+  TouchableWithoutFeedback,
+  Alert,
+  TextInput,
+} from "react-native";
 import React, { useState } from "react";
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
@@ -120,9 +129,9 @@ const ReceiveForm = () => {
     }
 
     const finalQuantities = {};
-    [...selectedItems, ...otherItems].forEach(item => {
+    [...selectedItems, ...otherItems].forEach((item) => {
       const qty = parseInt(quantities[item], 10);
-      finalQuantities[item] = (isNaN(qty) || qty < 1) ? 1 : qty;
+      finalQuantities[item] = isNaN(qty) || qty < 1 ? 1 : qty;
     });
 
     try {
@@ -164,10 +173,7 @@ const ReceiveForm = () => {
   return (
     <ThemedView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <Spacer height={90} />
           <ThemedText title style={styles.heading}>
             Receive Form
@@ -184,17 +190,10 @@ const ReceiveForm = () => {
                 <View key={item}>
                   <TouchableOpacity
                     onPress={() => toggleItem(item)}
-                    style={[
-                      styles.itemButton,
-                      selectedItems.includes(item) && styles.itemSelected,
-                    ]}
+                    style={[styles.itemButton, selectedItems.includes(item) && styles.itemSelected]}
                   >
                     <ThemedText
-                      style={
-                        selectedItems.includes(item)
-                          ? styles.itemTextSelected
-                          : styles.itemText
-                      }
+                      style={selectedItems.includes(item) ? styles.itemTextSelected : styles.itemText}
                     >
                       {item}
                     </ThemedText>
@@ -222,17 +221,10 @@ const ReceiveForm = () => {
                 <View key={item}>
                   <TouchableOpacity
                     onPress={() => toggleItem(item)}
-                    style={[
-                      styles.itemButton,
-                      selectedItems.includes(item) && styles.itemSelected,
-                    ]}
+                    style={[styles.itemButton, selectedItems.includes(item) && styles.itemSelected]}
                   >
                     <ThemedText
-                      style={
-                        selectedItems.includes(item)
-                          ? styles.itemTextSelected
-                          : styles.itemText
-                      }
+                      style={selectedItems.includes(item) ? styles.itemTextSelected : styles.itemText}
                     >
                       {item}
                     </ThemedText>
@@ -306,20 +298,14 @@ const ReceiveForm = () => {
 
           <View style={styles.radioContainer}>
             <TouchableOpacity
-              style={[
-                styles.radioButton,
-                selectionMethod === "zip" && styles.radioSelected,
-              ]}
+              style={[styles.radioButton, selectionMethod === "zip" && styles.radioSelected]}
               onPress={() => setSelectionMethod("zip")}
             >
               <ThemedText style={styles.radioText}>Zip Code</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[
-                styles.radioButton,
-                selectionMethod === "location" && styles.radioSelected,
-              ]}
+              style={[styles.radioButton, selectionMethod === "location" && styles.radioSelected]}
               onPress={() => setSelectionMethod("location")}
             >
               <ThemedText style={styles.radioText}>Current Location</ThemedText>
@@ -364,207 +350,111 @@ const ReceiveForm = () => {
 export default ReceiveForm;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#bcd7f5ff',
-  },
-  scrollContent: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  heading: {
-    fontWeight: 'bold',
-    fontSize: 28,
-    color: '#1F2A37',
-    textAlign: 'center',
-  },
-  supplyContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '85%',
-    gap: 10,
-    marginTop: 10,
-  },
-  column: {
-    flex: 1,
-    gap: 10,
-  },
+  container: { flex: 1, backgroundColor: "#bcd7f5ff" },
+  scrollContent: { padding: 20, alignItems: "center" },
+  heading: { fontWeight: "bold", fontSize: 28, color: "#1F2A37", textAlign: "center" },
+  supplyContainer: { flexDirection: "row", justifyContent: "space-between", width: "85%", gap: 10, marginTop: 10 },
+  column: { flex: 1, gap: 10 },
   itemButton: {
     paddingVertical: 14,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
+    borderColor: "#ccc",
+    backgroundColor: "#fff",
+    shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 3 },
-    alignItems: 'center',
+    alignItems: "center",
   },
-  itemSelected: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
-    shadowOpacity: 0.2,
-  },
-  itemText: {
-    textAlign: 'center',
-    color: '#333',
-    fontWeight: '500',
-  },
-  itemTextSelected: {
-    textAlign: 'center',
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 5,
-    gap: 5,
-  },
-  quantityLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
+  itemSelected: { backgroundColor: "#4A90E2", borderColor: "#4A90E2", shadowOpacity: 0.2 },
+  itemText: { textAlign: "center", color: "#333", fontWeight: "500" },
+  itemTextSelected: { textAlign: "center", color: "#fff", fontWeight: "bold" },
+  quantityContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5, gap: 5 },
+  quantityLabel: { fontSize: 12, color: "#666" },
   quantityInput: {
     width: 50,
     height: 30,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderRadius: 8,
-    textAlign: 'center',
-    backgroundColor: '#fff',
-    color: '#000',
+    textAlign: "center",
+    backgroundColor: "#fff",
+    color: "#000",
   },
-  otherInputWrapper: {
-    flexDirection: 'row',
-    width: '90%',
-    gap: 10,
-    marginTop: 10,
-  },
+  otherInputWrapper: { flexDirection: "row", width: "90%", gap: 10, marginTop: 10 },
   otherInput: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     paddingVertical: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
-  addButton: {
-    backgroundColor: '#4A90E2',
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  otherItemsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-    width: '90%',
-  },
+  addButton: { backgroundColor: "#4A90E2", paddingHorizontal: 20, borderRadius: 20, justifyContent: "center" },
+  addButtonText: { color: "#fff", fontWeight: "600" },
+  otherItemsList: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12, width: "90%" },
   otherItemChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DCEEFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#DCEEFF",
     borderRadius: 20,
     paddingVertical: 6,
     paddingLeft: 12,
     paddingRight: 8,
     gap: 8,
   },
-  otherItemText: {
-    fontSize: 14,
-    color: '#4A90E2',
-    fontWeight: '500',
-  },
-  quantityMini: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  quantityMiniLabel: {
-    fontSize: 11,
-    color: '#4A90E2',
-  },
+  otherItemText: { fontSize: 14, color: "#4A90E2", fontWeight: "500" },
+  quantityMini: { flexDirection: "row", alignItems: "center", gap: 3 },
+  quantityMiniLabel: { fontSize: 11, color: "#4A90E2" },
   quantityMiniInput: {
     width: 35,
     height: 22,
     borderWidth: 1,
-    borderColor: '#4A90E2',
+    borderColor: "#4A90E2",
     borderRadius: 5,
-    textAlign: 'center',
-    backgroundColor: '#fff',
+    textAlign: "center",
+    backgroundColor: "#fff",
     fontSize: 11,
-    color: '#000',
+    color: "#000",
   },
-  removeButton: {
-    fontSize: 16,
-    color: '#4A90E2',
-    fontWeight: 'bold',
-  },
-  radioContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '90%',
-    marginTop: 10,
-  },
+  removeButton: { fontSize: 16, color: "#4A90E2", fontWeight: "bold" },
+  radioContainer: { flexDirection: "row", justifyContent: "space-between", width: "90%", marginTop: 10 },
   radioButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: '#ccc',
-    alignItems: 'center',
+    borderColor: "#ccc",
+    alignItems: "center",
     marginHorizontal: 5,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
+    backgroundColor: "#fff",
+    shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
-  radioSelected: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
-  },
-  radioText: {
-    color: '#333',
-    fontWeight: '600',
-  },
+  radioSelected: { backgroundColor: "#4A90E2", borderColor: "#4A90E2" },
+  radioText: { color: "#333", fontWeight: "600" },
   button: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: "#4A90E2",
     paddingVertical: 16,
     paddingHorizontal: 25,
     borderRadius: 30,
     marginVertical: 15,
-    width: '90%',
-    shadowColor: '#000',
+    width: "90%",
+    shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
-    alignItems: 'center',
+    alignItems: "center",
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
-    textAlign: 'center',
-  },
-  error: {
-    color: 'red',
-    fontSize: 14,
-    marginBottom: 10,
-    marginTop: 5,
-  },
+  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 18, textAlign: "center" },
+  error: { color: "red", fontSize: 14, marginBottom: 10, marginTop: 5 },
   input: {
     width: "90%",
     backgroundColor: "#e9f0f9",
