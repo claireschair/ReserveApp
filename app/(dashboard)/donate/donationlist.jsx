@@ -8,6 +8,13 @@ import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 
+function getLocationDisplay(locationData) {
+  if (!locationData) return "Not provided";
+  if (locationData.zipCode) return `Zip ${locationData.zipCode}`;
+  if (locationData.lat && locationData.lng) return "Location provided";
+  return "Not provided";
+}
+
 const SORT_LABELS = {
   score: "Best Match",
   items: "Most Items",
@@ -55,7 +62,6 @@ const DonationList = () => {
     setRefreshing(false);
   };
 
-  // Initial load
   useEffect(() => {
     if (user?.uid) {
       loadDonations();
@@ -237,13 +243,12 @@ const DonationList = () => {
     <ThemedView style={styles.container}>
       <Spacer height={70} />
       <View style={styles.headerCard}>
-      <ThemedText title style={styles.heading}>
-        My Donations
-      </ThemedText>
-
-      <ThemedText style={styles.subtitle}>
-        View your past and current donations!
-      </ThemedText>
+        <ThemedText title style={styles.heading}>
+          My Donations
+        </ThemedText>
+        <ThemedText style={styles.subtitle}>
+          View your past and current donations!
+        </ThemedText>
       </View>
 
       <View style={styles.searchContainer}>
@@ -348,7 +353,7 @@ const DonationList = () => {
                   <ThemedText style={styles.donationTitle}>Donation Items:</ThemedText>
                   <ThemedText>{(donation.items || []).join(", ")}</ThemedText>
                   <ThemedText style={styles.subtle}>
-                    Location: {donation.location?.zipCode ? `Zip ${donation.location.zipCode}` : "Not provided"}
+                    Location: {getLocationDisplay(donation.location)}
                   </ThemedText>
                 </View>
 
@@ -543,7 +548,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignSelf: "center",
     marginBottom: 25,
-
     shadowColor: "#4F7BFF",
     shadowOpacity: 0.12,
     shadowRadius: 20,
@@ -636,7 +640,6 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 18,
     marginBottom: 20,
-
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 8,

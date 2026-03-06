@@ -8,6 +8,13 @@ import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 
+function getLocationDisplay(locationData) {
+  if (!locationData) return "Not provided";
+  if (locationData.zipCode) return `Zip ${locationData.zipCode}`;
+  if (locationData.lat && locationData.lng) return "Location provided";
+  return "Not provided";
+}
+
 const SORT_LABELS = {
   score: "Best Match",
   items: "Most Items",
@@ -57,7 +64,6 @@ const RequestList = () => {
     setRefreshing(false);
   };
 
-  // Initial load
   useEffect(() => {
     if (user?.uid) {
       loadRequests();
@@ -274,19 +280,18 @@ const RequestList = () => {
         <ThemedText>Loading matches...</ThemedText>
       </ThemedView>
     );
-  }
+  };
 
   return (
     <ThemedView style={styles.container}>
       <Spacer height={70} />
       <View style={styles.headerCard}>
-      <ThemedText title style={styles.heading}>
-        Request Matches
-      </ThemedText>
-
-      <ThemedText style={styles.subtitle}>
-        See donors who match your requests!
-      </ThemedText>
+        <ThemedText title style={styles.heading}>
+          Request Matches
+        </ThemedText>
+        <ThemedText style={styles.subtitle}>
+          See donors who match your requests!
+        </ThemedText>
       </View>
 
       <View style={styles.searchContainer}>
@@ -381,7 +386,7 @@ const RequestList = () => {
                   <ThemedText style={styles.requestTitle}>Requested Items:</ThemedText>
                   <ThemedText>{(request.items || []).join(", ")}</ThemedText>
                   <ThemedText style={styles.subtle}>
-                    Location: {request.location?.zipCode ? `Zip ${request.location.zipCode}` : "Not provided"}
+                    Location: {getLocationDisplay(request.location)}
                   </ThemedText>
                 </View>
 
@@ -481,7 +486,7 @@ const RequestList = () => {
                       </ThemedText>
                       <ThemedText style={styles.itemsList}>Available: {m.partner?.items?.join(", ") || "N/A"}</ThemedText>
                       <ThemedText style={styles.subtle}>
-                        Donation Zip: {m.partner?.location?.zipCode || "Location not provided"}
+                        Donation Location: {getLocationDisplay(m.partner?.location)}
                       </ThemedText>
                       {m.quantitySufficient === false && (
                         <ThemedText style={styles.warningText}>Note: May not have full quantity needed</ThemedText>
@@ -567,7 +572,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignSelf: "center",
     marginBottom: 25,
-
     shadowColor: "#4F7BFF",
     shadowOpacity: 0.12,
     shadowRadius: 20,
@@ -594,7 +598,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderWidth: 1,
     borderColor: "#ddd",
-    //width: '70%',
   },
   filterButton: {
     backgroundColor: "#4A90E2",
@@ -657,15 +660,14 @@ const styles = StyleSheet.create({
   dropdownActiveText: { fontWeight: "bold", color: "#007AFF" },
   requestCard: {
     backgroundColor: "white",
-  padding: 18,
-  borderRadius: 18,
-  marginBottom: 20,
-
-  shadowColor: "#000",
-  shadowOpacity: 0.08,
-  shadowRadius: 8,
-  shadowOffset: { width: 0, height: 3 },
-  elevation: 4,
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   requestTitle: { fontWeight: "bold", fontSize: 16 },
   requestHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },

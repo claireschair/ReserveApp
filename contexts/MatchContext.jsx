@@ -23,7 +23,44 @@ const MIN_MATCH_SCORE = 1;
 const MAX_DISTANCE_KM = 50;
 const ALLOW_SELF_MATCHING = true;
 
-// Helper functions
+async function getZipCodeFromCoordinates(latitude, longitude) {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'SchoolSupplyApp/1.0',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Geocoding request failed');
+    }
+
+    const data = await response.json();
+
+    const zipCode = 
+      data.address?.postcode || 
+      data.address?.postal_code || 
+      data.address?.zip_code;
+
+    if (zipCode) {
+      const cleanZip = zipCode.replace(/[^\d-]/g, '');
+      const match = cleanZip.match(/^(\d{5})(-\d{4})?$/);
+      
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting zip code from coordinates:', error);
+    return null;
+  }
+}
+
 function normalizeItems(items = []) {
   return items.map((i) => String(i).trim().toLowerCase()).filter(Boolean);
 }
@@ -132,16 +169,29 @@ export function MatchProvider({ children }) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + EXPIRATION_DAYS);
 
+    let finalLocation = {
+      zipCode: locationData.zipCode || null,
+      lat: locationData.lat || null,
+      lng: locationData.lng || null,
+    };
+
+    if (locationData.lat && locationData.lng && !locationData.zipCode) {
+      try {
+        const zipCode = await getZipCodeFromCoordinates(locationData.lat, locationData.lng);
+        if (zipCode) {
+          finalLocation.zipCode = zipCode;
+        }
+      } catch (error) {
+        console.error('Failed to get zip code from coordinates:', error);
+      }
+    }
+
     const newRequest = await addDoc(collection(db, "requests"), {
       userId,
       type,
       items,
       quantities,
-      location: {
-        zipCode: locationData.zipCode || null,
-        lat: locationData.lat || null,
-        lng: locationData.lng || null,
-      },
+      location: finalLocation,
       status: "active",
       createdAt: Timestamp.now(),
       expiresAt: Timestamp.fromDate(expiresAt),
@@ -175,11 +225,11 @@ export function MatchProvider({ children }) {
 
         const donationDoc =
           type === "donate"
-            ? { items, quantities, location: locationData }
+            ? { items, quantities, location: finalLocation }
             : otherRequest;
         const requestDoc =
           type === "receive"
-            ? { items, quantities, location: locationData }
+            ? { items, quantities, location: finalLocation }
             : otherRequest;
 
         const matchResult = calculateMatchScore(donationDoc, requestDoc);
@@ -761,4 +811,20 @@ export function MatchProvider({ children }) {
       {children}
     </MatchContext.Provider>
   );
+}
+
+export function getLocationDisplay(locationData) {
+  if (!locationData) {
+    return "Not provided";
+  }
+
+  if (locationData.zipCode) {
+    return `Zip ${locationData.zipCode}`;
+  }
+
+  if (locationData.lat && locationData.lng) {
+    return `Location provided`;
+  }
+
+  return "Not provided";
 }
