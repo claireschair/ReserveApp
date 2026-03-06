@@ -47,7 +47,7 @@ const Map = () => {
       >
         {centers.map((center) => (
           <Marker
-            key={center.$id}
+            key={center.id}
             coordinate={{
               latitude: center.lat,
               longitude: center.lng,
