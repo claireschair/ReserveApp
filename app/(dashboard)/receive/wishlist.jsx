@@ -1,13 +1,21 @@
 import { StyleSheet, TextInput, TouchableOpacity, View, Keyboard, Alert } from 'react-native';
 import { useState, useEffect, useContext } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import { useWishlist } from "../../../hooks/useWishlist";
 import { UserContext } from '../../../contexts/UserContext';
-import { database } from '../../../lib/appwrite';
-import { Query } from 'react-native-appwrite';
+
+const isAmazonLink = (url) => {
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.hostname.includes("amazon.");
+  } catch {
+    return false;
+  }
+};
 
 const Wishlist = () => {
   const [name, setName] = useState("");
@@ -19,25 +27,23 @@ const Wishlist = () => {
   const [isTeacher, setIsTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const { saveWishlist } = useWishlist();
+  const { saveWishlist, existingWishlist } = useWishlist();
   const { user } = useContext(UserContext);
 
   useEffect(() => {
-    const checkUserLabel = () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      // The label is directly on the user object
-      const userLabel = user.label;
-      console.log("User label:", userLabel);
-      setIsTeacher(userLabel === "teacher");
-      setLoading(false);
-    };
-
-    checkUserLabel();
+    if (!user) { setLoading(false); return; }
+    setIsTeacher(user.label === "teacher");
+    setLoading(false);
   }, [user]);
+
+  // Pre-fill form if wishlist already exists
+  useEffect(() => {
+    if (existingWishlist) {
+      setName(existingWishlist.name || "");
+      setAmazon(existingWishlist.amazonLink || "");
+      setItems(existingWishlist.items || []);
+    }
+  }, [existingWishlist]);
 
   const handleAddItem = () => {
     if (itemInput.trim()) {
@@ -63,13 +69,18 @@ const Wishlist = () => {
       return;
     }
 
+    if (!isAmazonLink(amazon)) {
+      setError("Please enter a valid Amazon link (must be from amazon.com).");
+      return;
+    }
+
     try {
       await saveWishlist(name, amazon, items);
-      setName("");
-      setAmazon("");
-      setItems([]);
       setItemInput("");
-      Alert.alert("Success", "Thank you for submitting your wishlist!");
+      Alert.alert(
+        "Success",
+        existingWishlist ? "Your wishlist has been updated!" : "Thank you for submitting your wishlist!"
+      );
     } catch (err) {
       setError(err.message || "Something went wrong.");
     }
@@ -79,15 +90,13 @@ const Wishlist = () => {
     <ThemedView style={styles.container}>
       <Spacer height={80} />
       <View style={styles.headerCard}>
-      <ThemedText style={styles.heading}>
-        Add To Your Wishlist
-      </ThemedText>
-
-      <Spacer height={2} />
-
-      <ThemedText style={styles.subtitle}>
-        Share classroom needs with supporters
-      </ThemedText>
+        <ThemedText style={styles.heading}>
+          {existingWishlist ? "Edit Your Wishlist" : "Add To Your Wishlist"}
+        </ThemedText>
+        <Spacer height={2} />
+        <ThemedText style={styles.subtitle}>
+          Share classroom needs with supporters
+        </ThemedText>
       </View>
 
       <Spacer height={10} />
@@ -134,7 +143,7 @@ const Wishlist = () => {
           <ThemedText style={styles.label}>Amazon Wishlist Link</ThemedText>
           <Spacer height={8} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, amazon && !isAmazonLink(amazon) && styles.inputError]}
             placeholder="https://www.amazon.com/..."
             value={amazon}
             onChangeText={setAmazon}
@@ -143,12 +152,17 @@ const Wishlist = () => {
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
           />
+          {amazon && !isAmazonLink(amazon) && (
+            <ThemedText style={styles.inlineError}>
+              ⚠️ This doesn't look like an Amazon link
+            </ThemedText>
+          )}
 
           <Spacer height={20} />
 
           <ThemedText style={styles.label}>Specific Items (Optional)</ThemedText>
           <Spacer height={8} />
-          
+
           <View style={styles.itemInputWrapper}>
             <TextInput
               style={[styles.input, styles.itemInput]}
@@ -160,10 +174,7 @@ const Wishlist = () => {
               onSubmitEditing={handleAddItem}
               returnKeyType="done"
             />
-            <TouchableOpacity 
-              style={styles.addButton} 
-              onPress={handleAddItem}
-            >
+            <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
               <ThemedText style={styles.addButtonText}>Add</ThemedText>
             </TouchableOpacity>
           </View>
@@ -199,7 +210,9 @@ const Wishlist = () => {
           )}
 
           <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-            <ThemedText style={styles.buttonText}>Submit Wishlist</ThemedText>
+            <ThemedText style={styles.buttonText}>
+              {existingWishlist ? "Update Wishlist ✏️" : "Submit Wishlist"}
+            </ThemedText>
           </TouchableOpacity>
         </View>
       )}
@@ -223,6 +236,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+  emptyState: {
+    alignItems: "center",
+  },
   warningText: {
     fontSize: 16,
     textAlign: "center",
@@ -241,7 +257,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignSelf: "center",
     marginBottom: 35,
-
     shadowColor: "#4F7BFF",
     shadowOpacity: 0.12,
     shadowRadius: 20,
@@ -282,9 +297,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111",
   },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 12,
+  inputError: {
+    borderWidth: 1,
+    borderColor: "#d32f2f",
+  },
+  inlineError: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: 6,
+    marginLeft: 4,
   },
   itemInputWrapper: {
     flexDirection: "row",
@@ -323,7 +344,6 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     fontSize: 16,
-    //backgroundColor: "#519ae9",
     fontWeight: "bold",
     paddingLeft: 4,
   },

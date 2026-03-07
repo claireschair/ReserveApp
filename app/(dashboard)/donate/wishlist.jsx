@@ -21,15 +21,29 @@ const Wishlist = () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Get all users
+      const usersSnapshot = await getDocs(collection(db, "users"));
       
-      const querySnapshot = await getDocs(collection(db, 'teacher_wishlists'));
-      const wishlistsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Shuffle the wishlists randomly
-      const shuffled = wishlistsData.sort(() => Math.random() - 0.5);
+      const allWishlists = [];
+
+      // For each user, check if they have a wishlist subcollection
+      await Promise.all(
+        usersSnapshot.docs.map(async (userDoc) => {
+          const wishlistsSnapshot = await getDocs(
+            collection(db, "users", userDoc.id, "wishlists")
+          );
+          wishlistsSnapshot.docs.forEach((wishlistDoc) => {
+            allWishlists.push({
+              id: wishlistDoc.id,
+              ...wishlistDoc.data(),
+            });
+          });
+        })
+      );
+
+      // Shuffle randomly
+      const shuffled = allWishlists.sort(() => Math.random() - 0.5);
       setWishlists(shuffled);
     } catch (err) {
       console.error("Error loading wishlists:", err);
@@ -37,7 +51,8 @@ const Wishlist = () => {
     } finally {
       setLoading(false);
     }
-  };
+};
+
 
   const openAmazonLink = (url) => {
     if (url) {

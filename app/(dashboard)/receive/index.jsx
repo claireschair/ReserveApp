@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import Spacer from "../../../components/Spacer";
+import { useWishlist } from "../../../hooks/useWishlist";
 
 import ReceiveIcon from "../../../assets/icons/receive.png";
 
@@ -12,6 +13,7 @@ const { width } = Dimensions.get('window');
 
 const Receive = () => {
   const router = useRouter();
+  const { existingWishlist } = useWishlist();
 
   const buttons = [
     {
@@ -28,8 +30,10 @@ const Receive = () => {
     },
     {
       icon: 'heart-circle-outline',
-      label: 'Add to Your Wishlist',
-      description: 'Add items you need to your personal wishlist so donors can help.',
+      label: existingWishlist ? 'Edit Your Wishlist' : 'Add Your Wishlist',
+      description: existingWishlist
+        ? 'Update the items on your wishlist so donors can help.'
+        : 'Add items you need to your personal wishlist so donors can help.',
       route: '/(dashboard)/receive/wishlist',
     },
     {
@@ -39,6 +43,8 @@ const Receive = () => {
       route: '/(dashboard)/receive/requestlist',
     },
   ];
+
+  // rest of the file stays exactly the same
 
   return (
     <ThemedView style={styles.container}>
