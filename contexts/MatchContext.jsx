@@ -201,7 +201,6 @@ export function MatchProvider({ children }) {
         pendingSince: null,
         myContact: null,
         partnerContact: null,
-        score: null,
       },
     });
 
@@ -484,6 +483,9 @@ export function MatchProvider({ children }) {
       );
     }
 
+    const donationDoc = myRequest.type === "donate" ? myRequest : theirRequest;
+    const receiveDoc = myRequest.type === "receive" ? myRequest : theirRequest;
+
     await updateDoc(doc(db, "requests", myRequest.id), {
       status: "pending",
       "match.partnerId": theirRequest.id,
@@ -498,7 +500,6 @@ export function MatchProvider({ children }) {
       "match.pendingSince": Timestamp.now(),
     });
 
-    // Notify the other user
     try {
       const pushToken = await getUserPushToken(theirRequest.userId);
       if (pushToken) {
@@ -789,6 +790,97 @@ export function MatchProvider({ children }) {
     return unsubscribe;
   }
 
+  async function getSupplyStats() {
+    try {
+      const requestsQuery = query(
+        collection(db, "requests"),
+        where("status", "==", "completed"),
+        where("type", "==", "donate")  // ✅ Only count donations to avoid double counting
+      );
+      
+      const snapshot = await getDocs(requestsQuery);
+      const completedDonations = snapshot.docs.map(doc => doc.data());
+      
+      let totalItemsDistributed = 0;
+      
+      completedDonations.forEach(donation => {
+        if (donation.items && donation.quantities) {
+          donation.items.forEach((item, index) => {
+            const quantity = donation.quantities[index] || 1;
+            totalItemsDistributed += quantity;
+          });
+        }
+      });
+      
+      // Get active stats for gap analysis
+      const activeQuery = query(
+        collection(db, "requests"),
+        where("status", "in", ["active", "pending", "matched"])
+      );
+      
+      const activeSnapshot = await getDocs(activeQuery);
+      const activeRequests = activeSnapshot.docs.map(doc => doc.data());
+      
+      const donations = activeRequests.filter(r => r.type === "donate");
+      const receives = activeRequests.filter(r => r.type === "receive");
+      
+      const itemCounts = { donated: {}, requested: {} };
+      
+      donations.forEach(donation => {
+        donation.items?.forEach((item, index) => {
+          const normalizedItem = item.toLowerCase();
+          const quantity = donation.quantities?.[index] || 1;
+          itemCounts.donated[normalizedItem] = (itemCounts.donated[normalizedItem] || 0) + quantity;
+        });
+      });
+      
+      receives.forEach(receive => {
+        receive.items?.forEach((item, index) => {
+          const normalizedItem = item.toLowerCase();
+          const quantity = receive.quantities?.[index] || 1;
+          itemCounts.requested[normalizedItem] = (itemCounts.requested[normalizedItem] || 0) + quantity;
+        });
+      });
+      
+      const allItems = new Set([
+        ...Object.keys(itemCounts.donated),
+        ...Object.keys(itemCounts.requested)
+      ]);
+      
+      const stats = Array.from(allItems).map(item => ({
+        item,
+        donated: itemCounts.donated[item] || 0,
+        requested: itemCounts.requested[item] || 0,
+        gap: (itemCounts.requested[item] || 0) - (itemCounts.donated[item] || 0)
+      }));
+      
+      return {
+        totalDonations: donations.length,
+        totalRequests: receives.length,
+        totalItemsDistributed,
+        itemStats: stats,
+        topNeeded: stats
+          .filter(s => s.gap > 0)
+          .sort((a, b) => b.gap - a.gap)
+          .slice(0, 10),
+        topSurplus: stats
+          .filter(s => s.gap < 0)
+          .sort((a, b) => a.gap - b.gap)
+          .slice(0, 10)
+      };
+    } catch (error) {
+      console.error("Error getting supply stats:", error);
+      return {
+        totalDonations: 0,
+        totalRequests: 0,
+        totalItemsDistributed: 0,
+        itemStats: [],
+        topNeeded: [],
+        topSurplus: []
+      };
+    }
+  }
+
   return (
     <MatchContext.Provider
       value={{
@@ -806,6 +898,7 @@ export function MatchProvider({ children }) {
         deleteDonation: deleteRequest,
         deleteRequest,
         subscribeToRequest,
+        getSupplyStats,
       }}
     >
       {children}

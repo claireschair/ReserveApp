@@ -1,100 +1,159 @@
-import { View, Image, StyleSheet, Dimensions, ScrollView } from 'react-native'
-import Spacer from "../../components/Spacer"
-import ThemedText from "../../components/ThemedText"
-import ThemedView from "../../components/ThemedView"
-import ThemedLogo from "../../components/ThemedLogo"
-const {width, height } = Dimensions.get('window')
+import { useEffect, useState } from 'react';
+import { View, Image, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from "../../lib/firebase";
+import { useMatch } from "../../hooks/useMatch";
+import Spacer from "../../components/Spacer";
+import ThemedText from "../../components/ThemedText";
+import ThemedView from "../../components/ThemedView";
+import ThemedLogo from "../../components/ThemedLogo";
+
+const { width, height } = Dimensions.get('window');
 
 const Home = () => {
+  const { getSupplyStats } = useMatch();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadStats();
+
+    // Set up real-time listener for completed donations
+    const completedQuery = query(
+      collection(db, "requests"),
+      where("status", "==", "completed"),
+      where("type", "==", "donate")
+    );
+
+    const unsubscribe = onSnapshot(
+      completedQuery,
+      (snapshot) => {
+        // Recalculate stats when completed donations change
+        loadStats();
+      },
+      (error) => {
+        console.error("Error listening to completed donations:", error);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const data = await getSupplyStats();
+      setStats(data);
+    } catch (error) {
+      console.error("Error loading stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatNumber = (num) => {
+    if (num >= 1000000000) {
+      return (num / 1000000000).toFixed(1) + 'B';
+    }
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-      <View style ={styles.topBackground} />
-      <View style={styles.circleBackground} />
-      <View style={styles.header}>
+        <View style={styles.topBackground} />
+        <View style={styles.circleBackground} />
+        <View style={styles.header}>
+          
+          <Spacer />
+          <ThemedLogo />
         
-        <Spacer />
-        <ThemedLogo />
-      
-        <ThemedText title style={styles.heading}>
-          Reserve
-        </ThemedText>
-        <Spacer height={20} />
-      <ThemedText style={styles.subheading}>
-        Our Mission
-      </ThemedText>
-      <ThemedText style={styles.paragraph}>
-        Reserve aims to expand access to education by helping school supplies reach the students and teachers who need them most.
-        We do this by re-serving gently used and donated materials, connecting communities to local resources, 
-        and support classrooms through shared wishlists and direct giving. Our mission is simple: reduce waste, increase 
-        opportunity, and make learning possible for everyone. 
-      </ThemedText>
-
-
-      <View style={styles.squareRow}>
-        <View style={styles.square}>
-          <ThemedText style={styles.statText}>70%</ThemedText>
-          <ThemedText style={styles.descriptionText}>global learning poverty rate</ThemedText>
-        </View>
-        <View style={styles.square}>
-          <ThemedText style={styles.statText}>0</ThemedText>
-          <ThemedText style={styles.descriptionText}>school supplies distributed</ThemedText>
-        </View>
-        <View style={styles.square}>
-          <ThemedText style={styles.statText}>68.8</ThemedText>
-          <ThemedText style={styles.descriptionText}>million teachers shortage</ThemedText>
-        </View>
-      </View>
-
-      <Spacer />
-
-      <View style={styles.howItWorksCard}>
-      <ThemedText style={styles.subheading}>
-        How Reserve Works
-      </ThemedText>
-      <Spacer height={10} />
-      <View style = {styles.stepItem}>
-        <Image source={require('../../assets/icons/donate.png')} style={styles.stepIcon}/>
-        <View style = {styles.stepTextContainer}>
-          <ThemedText style = {styles.stepTitle}>Give</ThemedText>
-          <ThemedText style={styles.stepDescription}>
-            Donate used or new supplies to verified drop off locations.
+          <ThemedText title style={styles.heading}>
+            Reserve
           </ThemedText>
-        </View>
-      </View>
-      <View style = {styles.stepItem}>
-        <Image source={require('../../assets/icons/connect.png')} style={styles.stepIcon}/>
-        <View style = {styles.stepTextContainer}>
-          <ThemedText style = {styles.stepTitle}>Connect</ThemedText>
-          <ThemedText style={styles.stepDescription}>
-            Browse wishlists, start a donation drive, or discover local classrooms in need.
+          <Spacer height={20} />
+          <ThemedText style={styles.subheading}>
+            Our Mission
           </ThemedText>
-        </View>
-      </View>
-      <View style = {styles.stepItem}>
-        <Image source={require('../../assets/icons/receive.png')} style={styles.stepIcon}/>
-        <View style = {styles.stepTextContainer}>
-          <ThemedText style = {styles.stepTitle}>Receive</ThemedText>
-          <ThemedText style={styles.stepDescription}>
-            Request supplies or get connected with nearby resources.
+          <ThemedText style={styles.paragraph}>
+            Reserve aims to expand access to education by helping school supplies reach the students and teachers who need them most.
+            We do this by re-serving gently used and donated materials, connecting communities to local resources, 
+            and support classrooms through shared wishlists and direct giving. Our mission is simple: reduce waste, increase 
+            opportunity, and make learning possible for everyone. 
           </ThemedText>
+
+          <View style={styles.squareRow}>
+            <View style={styles.square}>
+              <ThemedText style={styles.statText}>70%</ThemedText>
+              <ThemedText style={styles.descriptionText}>global learning poverty rate</ThemedText>
+            </View>
+            <View style={styles.square}>
+              <ThemedText style={styles.statText}>
+                {loading ? '...' : formatNumber(stats?.totalItemsDistributed || 0)}
+              </ThemedText>
+              <ThemedText style={styles.descriptionText}>school supplies distributed</ThemedText>
+            </View>
+            <View style={styles.square}>
+              <ThemedText style={styles.statText}>68.8</ThemedText>
+              <ThemedText style={styles.descriptionText}>million teachers shortage</ThemedText>
+            </View>
+          </View>
+
+          <Spacer />
+
+          <View style={styles.howItWorksCard}>
+            <ThemedText style={styles.subheading}>
+              How Reserve Works
+            </ThemedText>
+            <Spacer height={10} />
+            <View style={styles.stepItem}>
+              <Image source={require('../../assets/icons/donate.png')} style={styles.stepIcon}/>
+              <View style={styles.stepTextContainer}>
+                <ThemedText style={styles.stepTitle}>Give</ThemedText>
+                <ThemedText style={styles.stepDescription}>
+                  Donate used or new supplies to verified drop off locations.
+                </ThemedText>
+              </View>
+            </View>
+            <View style={styles.stepItem}>
+              <Image source={require('../../assets/icons/connect.png')} style={styles.stepIcon}/>
+              <View style={styles.stepTextContainer}>
+                <ThemedText style={styles.stepTitle}>Connect</ThemedText>
+                <ThemedText style={styles.stepDescription}>
+                  Browse wishlists, start a donation drive, or discover local classrooms in need.
+                </ThemedText>
+              </View>
+            </View>
+            <View style={styles.stepItem}>
+              <Image source={require('../../assets/icons/receive.png')} style={styles.stepIcon}/>
+              <View style={styles.stepTextContainer}>
+                <ThemedText style={styles.stepTitle}>Receive</ThemedText>
+                <ThemedText style={styles.stepDescription}>
+                  Request supplies or get connected with nearby resources.
+                </ThemedText>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
-      </View>
-      </View>
 
+        <Spacer height={100} />
 
-      <Spacer height={100} />
-
-    </ScrollView>
+      </ScrollView>
     </ThemedView>
-  )
+  );
 }
 
-export default Home
+export default Home;
 
 const styles = StyleSheet.create({
   container: {
@@ -104,11 +163,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     width: "100%",
-    height: "30%", //top half is blue
+    height: "30%",
     backgroundColor: "#4A90E2",
     zIndex: 0,
   },
-  circleBackground: { //Circle 
+  circleBackground: {
     position: 'absolute',
     top: 160,
     left: -width*0.15,
@@ -213,8 +272,6 @@ const styles = StyleSheet.create({
   stepTextContainer:{
     flex:1,
     flexDirection: 'column',
-    //marginLeft: 14,
-    //paddingRight: 20,
   },
   stepTitle: {
     fontSize: 30,
@@ -235,7 +292,7 @@ const styles = StyleSheet.create({
   howItWorksCard: {
     width: '90%',
     alignSelf: 'center',
-    backgroundColor:  'rgb(255, 255, 255)',
+    backgroundColor: 'rgb(255, 255, 255)',
     borderRadius: 28,
     paddingVertical: 25,
     paddingHorizontal: 10,
@@ -246,6 +303,5 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
-},
-
-})
+  },
+});
