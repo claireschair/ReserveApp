@@ -48,7 +48,7 @@ export function UserProvider({ children }) {
     await signInWithEmailAndPassword(auth, email, password);
   }
 
-  async function register(email, password, name, label) {
+  async function register(email, password, name, label, school) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     const uid = credential.user.uid;
 
@@ -57,6 +57,7 @@ export function UserProvider({ children }) {
       name,
       email,
       label,
+      school: school || null,
       pushToken: null,
       notificationsEnabled: true,
       createdAt: Timestamp.now(),
