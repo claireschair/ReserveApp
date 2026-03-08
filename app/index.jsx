@@ -12,6 +12,7 @@ const Home = () => {
     <ThemedView style={styles.container}>
       
       <View style={styles.header}>
+        <Spacer height={90} />
         <View style={styles.logoCircle}>
           <ThemedLogo />
         </View>

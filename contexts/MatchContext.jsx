@@ -21,7 +21,7 @@ const MATCH_TIMEOUT_HOURS = 48;
 const EXPIRATION_DAYS = 30;
 const MIN_MATCH_SCORE = 1;
 const MAX_DISTANCE_KM = 50;
-const ALLOW_SELF_MATCHING = true;
+const ALLOW_SELF_MATCHING = false;
 
 async function getZipCodeFromCoordinates(latitude, longitude) {
   try {
@@ -91,7 +91,6 @@ function calculateMatchScore(donation, request) {
   else if (completeness >= 0.5) score += 2;
   else if (completeness >= 0.25) score += 1;
 
-  // Check quantities
   let quantitySufficient = true;
   if (donation.quantities && request.quantities) {
     for (const item of overlap) {
@@ -113,7 +112,6 @@ function calculateMatchScore(donation, request) {
     if (quantitySufficient) score += 2;
   }
 
-  // Location scoring
   if (donation.location?.zipCode && request.location?.zipCode) {
     const diff = Math.abs(donation.location.zipCode - request.location.zipCode);
     if (diff === 0) score += 3;
@@ -204,7 +202,6 @@ export function MatchProvider({ children }) {
       },
     });
 
-    // Notify potential matches
     try {
       const oppositeType = type === "donate" ? "receive" : "donate";
       const q = query(
@@ -589,8 +586,7 @@ export function MatchProvider({ children }) {
     
     await updateDoc(doc(db, "requests", requestId), {
       "match.myContact": {
-        email: contactInfo.email || null,
-        phone: contactInfo.phone,
+        email: contactInfo.email,
       },
     });
 
@@ -695,8 +691,7 @@ export function MatchProvider({ children }) {
     await updateDoc(doc(db, "requests", requestId), {
       status: "matched",
       "match.myContact": {
-        email: contactInfo.email || null,
-        phone: contactInfo.phone,
+        email: contactInfo.email,
       },
       "match.partnerContact": partner.match.myContact,
     });
@@ -704,8 +699,7 @@ export function MatchProvider({ children }) {
     await updateDoc(doc(db, "requests", partnerId), {
       status: "matched",
       "match.partnerContact": {
-        email: contactInfo.email || null,
-        phone: contactInfo.phone,
+        email: contactInfo.email,
       },
     });
 
@@ -795,7 +789,7 @@ export function MatchProvider({ children }) {
       const requestsQuery = query(
         collection(db, "requests"),
         where("status", "==", "completed"),
-        where("type", "==", "donate")  // ✅ Only count donations to avoid double counting
+        where("type", "==", "donate") 
       );
       
       const snapshot = await getDocs(requestsQuery);
@@ -812,7 +806,6 @@ export function MatchProvider({ children }) {
         }
       });
       
-      // Get active stats for gap analysis
       const activeQuery = query(
         collection(db, "requests"),
         where("status", "in", ["active", "pending", "matched"])

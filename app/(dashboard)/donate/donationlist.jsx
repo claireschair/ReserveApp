@@ -1,8 +1,10 @@
 import { useEffect, useState, useContext } from "react";
 import { StyleSheet, ScrollView, View, TouchableOpacity, Alert, TextInput, Modal, RefreshControl } from "react-native";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { router } from "expo-router";
 import { db } from "../../../lib/firebase";
 import { useMatch } from "../../../hooks/useMatch";
+import { useChat } from "../../../hooks/useChat";
 import { UserContext } from "../../../contexts/UserContext";
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
@@ -30,7 +32,9 @@ const DonationList = () => {
     deleteDonation,
   } = useMatch();
 
+  const { getOrCreateChat } = useChat();
   const { user } = useContext(UserContext);
+  
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,7 +46,6 @@ const DonationList = () => {
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
 
   const loadDonations = async () => {
     try {
@@ -135,7 +138,6 @@ const DonationList = () => {
   const handleApprove = (requestId) => {
     setCurrentRequestId(requestId);
     setContactEmail("");
-    setContactPhone("");
     setContactModalVisible(true);
   };
 
@@ -163,20 +165,51 @@ const DonationList = () => {
   };
 
   const submitApproval = async () => {
-    if (!contactPhone.trim()) {
-      Alert.alert("Error", "Phone number is required.");
+    if (!contactEmail.trim()) {
+      Alert.alert("Error", "Email address is required.");
       return;
     }
+    
+    if (!contactEmail.includes('@')) {
+      Alert.alert("Error", "Please provide a valid email address.");
+      return;
+    }
+
     try {
       await approveDonation(currentRequestId, {
-        email: contactEmail || null,
-        phone: contactPhone,
+        email: contactEmail,
       });
       Alert.alert("Match approved!", "The requestor will provide their contact info next.");
       setContactModalVisible(false);
+      setContactEmail("");
+      setCurrentRequestId(null);
     } catch (err) {
       console.error("Error approving:", err);
       Alert.alert("Error", err.message || "Failed to approve match.");
+    }
+  };
+
+  const handleOpenChat = async (donationId, match) => {
+    try {
+      const chat = await getOrCreateChat(
+        donationId,
+        match.partner.userId,
+        {
+          myEmail: match.myContact.email,
+          partnerEmail: match.partnerContact.email,
+        }
+      );
+
+      router.push({
+        pathname: "/chat/[chatId]",
+        params: { 
+          chatId: chat.id, 
+          matchId: donationId,
+        },
+      });
+    } catch (error) {
+      Alert.alert("Error", "Failed to open chat");
+      console.error("Chat error:", error);
     }
   };
 
@@ -418,7 +451,7 @@ const DonationList = () => {
                       </ThemedText>
                       <Spacer height={8} />
                       <ThemedText style={styles.subtle}>
-                        Your contact: {match.myContact?.phone || "Not provided"}
+                        Your email: {match.myContact?.email || "Not provided"}
                       </ThemedText>
                       <ThemedText style={styles.subtle}>
                         Requested Items: {match.partner?.items?.join(", ") || "N/A"}
@@ -450,9 +483,6 @@ const DonationList = () => {
                         <ThemedText style={styles.contactDetail}>
                           Email: {match.partnerContact?.email || "N/A"}
                         </ThemedText>
-                        <ThemedText style={styles.contactDetail}>
-                          Phone: {match.partnerContact?.phone || "Not provided"}
-                        </ThemedText>
                       </View>
 
                       <Spacer height={8} />
@@ -464,8 +494,15 @@ const DonationList = () => {
                         </ThemedText>
                       </View>
 
+                      <TouchableOpacity
+                        style={styles.chatButton}
+                        onPress={() => handleOpenChat(donation.id, match)}
+                      >
+                        <ThemedText style={styles.chatButtonText}>💬 Open Chat</ThemedText>
+                      </TouchableOpacity>
+
                       <ThemedText style={styles.instructionText}>
-                        Contact the requestor to arrange pickup/delivery. Tap X to complete.
+                        Use chat to coordinate pickup/delivery. Tap X when complete.
                       </ThemedText>
                     </View>
                   ))}
@@ -485,23 +522,16 @@ const DonationList = () => {
           <View style={styles.modalContent}>
             <ThemedText title style={{ marginBottom: 10 }}>Approve Match</ThemedText>
             <ThemedText style={styles.modalHint}>
-              Provide your contact info. Phone required.
+              Provide your email address to exchange contact information.
             </ThemedText>
 
             <TextInput
               style={[styles.input, { color: "#111" }]}
-              placeholder="Email (optional)"
+              placeholder="Your Email *"
               value={contactEmail}
               onChangeText={setContactEmail}
               keyboardType="email-address"
-              placeholderTextColor="#666"
-            />
-            <TextInput
-              style={[styles.input, { color: "#111" }]}
-              placeholder="Phone (required)"
-              value={contactPhone}
-              onChangeText={setContactPhone}
-              keyboardType="phone-pad"
+              autoCapitalize="none"
               placeholderTextColor="#666"
             />
 
@@ -514,7 +544,11 @@ const DonationList = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, { flex: 1, marginLeft: 5, backgroundColor: "#f0f0f0", borderColor: "#ccc" }]}
-                onPress={() => setContactModalVisible(false)}
+                onPress={() => {
+                  setContactModalVisible(false);
+                  setContactEmail("");
+                  setCurrentRequestId(null);
+                }}
               >
                 <ThemedText>Cancel</ThemedText>
               </TouchableOpacity>
@@ -709,6 +743,24 @@ const styles = StyleSheet.create({
   matchDetailsBox: { backgroundColor: "#F5F5F5", padding: 10, borderRadius: 8, marginBottom: 8 },
   matchDetailLabel: { fontSize: 13, fontWeight: "bold", color: "#666", marginBottom: 4 },
   matchDetailText: { fontSize: 14, color: "#333" },
+  chatButton: {
+    backgroundColor: "#4A90E2",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  chatButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   instructionText: { fontSize: 13, color: "#555", fontStyle: "italic", marginTop: 8 },
   infoText: { fontSize: 13, color: "#555", marginTop: 4, fontStyle: "italic" },
   subtle: { fontSize: 12, color: "#666", marginTop: 2 },
@@ -748,6 +800,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     width: "85%", 
+    alignSelf: "center",
   },
   modalHint: { fontSize: 14, color: "#666", marginBottom: 10 },
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },

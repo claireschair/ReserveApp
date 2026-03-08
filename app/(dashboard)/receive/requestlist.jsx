@@ -1,8 +1,10 @@
 import { useEffect, useState, useContext } from "react";
 import { StyleSheet, ScrollView, View, TouchableOpacity, Alert, TextInput, Modal, RefreshControl } from "react-native";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { router } from "expo-router";
 import { db } from "../../../lib/firebase";
 import { useMatch } from "../../../hooks/useMatch";
+import { useChat } from "../../../hooks/useChat";
 import { UserContext } from "../../../contexts/UserContext";
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
@@ -32,7 +34,9 @@ const RequestList = () => {
     deleteRequest,
   } = useMatch();
 
+  const { getOrCreateChat } = useChat();
   const { user } = useContext(UserContext);
+  
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,7 +48,6 @@ const RequestList = () => {
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
 
   const loadRequests = async () => {
     try {
@@ -201,25 +204,55 @@ const RequestList = () => {
   const openContactModal = (requestId) => {
     setCurrentRequestId(requestId);
     setContactEmail("");
-    setContactPhone("");
     setContactModalVisible(true);
   };
 
   const handleProvideContact = async () => {
-    if (!contactPhone.trim()) {
-      Alert.alert("Error", "Phone number is required.");
+    if (!contactEmail.trim()) {
+      Alert.alert("Error", "Email address is required.");
       return;
     }
+    
+    if (!contactEmail.includes('@')) {
+      Alert.alert("Error", "Please provide a valid email address.");
+      return;
+    }
+
     try {
       await provideRequestorContact(currentRequestId, {
-        email: contactEmail || null,
-        phone: contactPhone,
+        email: contactEmail,
       });
       Alert.alert("Success!", "Match complete! You can now coordinate with the donor.");
       setContactModalVisible(false);
+      setContactEmail("");
+      setCurrentRequestId(null);
     } catch (err) {
       console.error("Error providing contact:", err);
       Alert.alert("Error", err.message || "Failed to save contact info.");
+    }
+  };
+
+  const handleOpenChat = async (requestId, match) => {
+    try {
+      const chat = await getOrCreateChat(
+        match.partner.id,
+        match.partner.userId,
+        {
+          myEmail: match.myContact.email,
+          partnerEmail: match.partnerContact.email,
+        }
+      );
+
+      router.push({
+        pathname: "/chat/[chatId]",
+        params: { 
+          chatId: chat.id, 
+          matchId: requestId,
+        },
+      });
+    } catch (error) {
+      Alert.alert("Error", "Failed to open chat");
+      console.error("Chat error:", error);
     }
   };
 
@@ -430,9 +463,6 @@ const RequestList = () => {
                     <ThemedText style={styles.contactDetail}>
                       Email: {completedMatch.partnerContact?.email || "Not provided"}
                     </ThemedText>
-                    <ThemedText style={styles.contactDetail}>
-                      Phone: {completedMatch.partnerContact?.phone || "Not provided"}
-                    </ThemedText>
                   </View>
 
                   <Spacer height={8} />
@@ -442,8 +472,15 @@ const RequestList = () => {
                     <ThemedText style={styles.matchDetailText}>{completedMatch.items?.join(", ") || "N/A"}</ThemedText>
                   </View>
 
+                  <TouchableOpacity
+                    style={styles.chatButton}
+                    onPress={() => handleOpenChat(request.id, completedMatch)}
+                  >
+                    <ThemedText style={styles.chatButtonText}>💬 Open Chat</ThemedText>
+                  </TouchableOpacity>
+
                   <ThemedText style={styles.instructionText}>
-                    Contact the donor to arrange pickup. Tap X to complete this match.
+                    Use chat to coordinate pickup. Tap X when complete.
                   </ThemedText>
                 </View>
               )}
@@ -513,23 +550,16 @@ const RequestList = () => {
           <View style={styles.modalContent}>
             <ThemedText title style={{ marginBottom: 10 }}>Complete Your Match</ThemedText>
             <ThemedText style={styles.modalHint}>
-              Provide your contact info so the donor can reach you. Phone number is required.
+              Provide your email address to exchange contact information.
             </ThemedText>
 
             <TextInput
               style={[styles.input, { color: "#111" }]}
-              placeholder="Email (optional)"
+              placeholder="Your Email *"
               value={contactEmail}
               onChangeText={setContactEmail}
               keyboardType="email-address"
-              placeholderTextColor="#666"
-            />
-            <TextInput
-              style={[styles.input, { color: "#111" }]}
-              placeholder="Phone (required)"
-              value={contactPhone}
-              onChangeText={setContactPhone}
-              keyboardType="phone-pad"
+              autoCapitalize="none"
               placeholderTextColor="#666"
             />
 
@@ -542,7 +572,11 @@ const RequestList = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.selectButton, { flex: 1, marginLeft: 5, backgroundColor: "#f0f0f0", borderColor: "#ccc" }]}
-                onPress={() => setContactModalVisible(false)}
+                onPress={() => {
+                  setContactModalVisible(false);
+                  setContactEmail("");
+                  setCurrentRequestId(null);
+                }}
               >
                 <ThemedText>Cancel</ThemedText>
               </TouchableOpacity>
@@ -705,6 +739,24 @@ const styles = StyleSheet.create({
   matchDetailsBox: { backgroundColor: "#F5F5F5", padding: 10, borderRadius: 8, marginBottom: 8 },
   matchDetailLabel: { fontSize: 13, fontWeight: "bold", color: "#666", marginBottom: 4 },
   matchDetailText: { fontSize: 14, color: "#333" },
+  chatButton: {
+    backgroundColor: "#4A90E2",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  chatButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   pendingTitle: { fontWeight: "bold", fontSize: 16, color: "#FF9800" },
   sectionTitle: { fontWeight: "bold", fontSize: 14, marginTop: 8, marginBottom: 4 },
   infoText: { fontSize: 13, color: "#555", marginTop: 4, fontStyle: "italic" },
@@ -731,7 +783,8 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
-    width: "85%", 
+    width: "85%",
+    alignSelf: "center",
   },
   modalHint: { fontSize: 14, color: "#666", marginBottom: 10 },
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },
