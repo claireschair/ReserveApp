@@ -8,49 +8,64 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useChat } from "../../hooks/useChat";
-import { useMatch } from "../../hooks/useMatch";
+import { useReport } from "../../hooks/useReport";
 import { UserContext } from "../../contexts/UserContext";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
 
+const REPORT_REASONS = [
+  { value: "inappropriate_language", label: "Inappropriate Language" },
+  { value: "harassment", label: "Harassment or Bullying" },
+  { value: "spam", label: "Spam or Scam" },
+  { value: "no_show", label: "Didn't Show Up for Exchange" },
+  { value: "unsafe_behavior", label: "Unsafe Behavior" },
+  { value: "fake_items", label: "Fake or Misrepresented Items" },
+  { value: "other", label: "Other" },
+];
+
 const ChatScreen = () => {
   const { chatId, matchId } = useLocalSearchParams();
   const { user } = useContext(UserContext);
-  const { subscribeToMessages, sendMessage, markMessagesAsRead, closeChat } = useChat();
-  const { completeMatch } = useMatch();
+  const { subscribeToMessages, sendMessage, markMessagesAsRead } = useChat();
+  const { submitReport, hasReported } = useReport();
   
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [selectedReason, setSelectedReason] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [partnerUserId, setPartnerUserId] = useState(null);
   const flatListRef = useRef(null);
 
   useEffect(() => {
-    if (!chatId) {
-      console.log("No chatId provided");
-      return;
+    if (messages.length > 0 && !partnerUserId) {
+      const firstOtherMessage = messages.find(m => m.senderId !== user?.uid);
+      if (firstOtherMessage) {
+        setPartnerUserId(firstOtherMessage.senderId);
+      }
     }
+  }, [messages, user?.uid]);
 
-    console.log("Setting up message listener for chat:", chatId);
+  useEffect(() => {
+    if (!chatId) return;
 
     const unsubscribe = subscribeToMessages(chatId, (newMessages) => {
-      console.log("Received messages update:", newMessages.length);
       setMessages(newMessages);
       
       if (newMessages.length > 0) {
-        markMessagesAsRead(chatId).catch(err => {
-          console.log("Error marking as read (non-critical):", err);
-        });
+        markMessagesAsRead(chatId).catch(() => {});
       }
     });
 
-    return () => {
-      console.log("Cleaning up message listener");
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [chatId]);
 
   useEffect(() => {
@@ -65,46 +80,83 @@ const ChatScreen = () => {
     if (!inputText.trim() || sending) return;
 
     const messageText = inputText.trim();
-    console.log("Sending message:", messageText);
     
     setSending(true);
-    setInputText(""); 
+    setInputText("");
     
     try {
       await sendMessage(chatId, messageText);
-      console.log("Message sent successfully");
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message");
-      setInputText(messageText); 
+      setInputText(messageText);
     } finally {
       setSending(false);
     }
   };
 
-  const handleCompleteMatch = () => {
-    Alert.alert(
-      "Complete Match",
-      "This will close the chat and mark the match as completed. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
+  const handleOpenReportModal = async () => {
+    if (!partnerUserId) {
+      Alert.alert("Error", "Unable to identify the other user");
+      return;
+    }
+
+    const alreadyReported = await hasReported(partnerUserId, chatId);
+    if (alreadyReported) {
+      Alert.alert(
+        "Already Reported",
+        "You have already submitted a report for this user. Our moderators will review it soon."
+      );
+      return;
+    }
+
+    setReportModalVisible(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!selectedReason) {
+      Alert.alert("Error", "Please select a reason for the report");
+      return;
+    }
+
+    if (!reportDescription.trim()) {
+      Alert.alert("Error", "Please provide a description of the issue");
+      return;
+    }
+
+    setSubmittingReport(true);
+
+    try {
+      await submitReport(
+        partnerUserId,
+        selectedReason,
+        reportDescription,
         {
-          text: "Complete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await closeChat(chatId);
-              await completeMatch(matchId);
-              Alert.alert("Success", "Match completed!");
-              router.back();
-            } catch (error) {
-              console.error("Error completing match:", error);
-              Alert.alert("Error", "Failed to complete match");
-            }
+          chatId,
+          matchId,
+        }
+      );
+
+      Alert.alert(
+        "Report Submitted",
+        "Thank you for reporting this issue. Our moderators will review it and take appropriate action.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              setReportModalVisible(false);
+              setSelectedReason("");
+              setReportDescription("");
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error("Error submitting report:", error);
+      Alert.alert("Error", "Failed to submit report. Please try again.");
+    } finally {
+      setSubmittingReport(false);
+    }
   };
 
   const renderMessage = ({ item }) => {
@@ -160,18 +212,16 @@ const ChatScreen = () => {
     <ThemedView style={styles.container}>
       <Spacer height={60} />
       
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <ThemedText style={styles.backButton}>← Back</ThemedText>
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Match Chat</ThemedText>
-        <TouchableOpacity onPress={handleCompleteMatch}>
-          <ThemedText style={styles.completeButton}>Complete</ThemedText>
+        <TouchableOpacity onPress={handleOpenReportModal}>
+          <ThemedText style={styles.reportButton}>Report</ThemedText>
         </TouchableOpacity>
       </View>
 
-      {/* Messages List */}
       {messages.length === 0 ? (
         <View style={styles.emptyState}>
           <ThemedText style={styles.emptyText}>No messages yet</ThemedText>
@@ -191,7 +241,6 @@ const ChatScreen = () => {
         />
       )}
 
-      {/* Input Area */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
@@ -217,6 +266,81 @@ const ChatScreen = () => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={reportModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setReportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ThemedText style={styles.modalTitle}>Report User</ThemedText>
+            <ThemedText style={styles.modalSubtitle}>
+              Help us keep the community safe. What's the issue?
+            </ThemedText>
+
+            <ScrollView style={styles.reasonsScroll}>
+              {REPORT_REASONS.map((reason) => (
+                <TouchableOpacity
+                  key={reason.value}
+                  style={[
+                    styles.reasonOption,
+                    selectedReason === reason.value && styles.reasonOptionSelected,
+                  ]}
+                  onPress={() => setSelectedReason(reason.value)}
+                >
+                  <View style={styles.radioButton}>
+                    {selectedReason === reason.value && (
+                      <View style={styles.radioButtonInner} />
+                    )}
+                  </View>
+                  <ThemedText style={styles.reasonText}>{reason.label}</ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TextInput
+              style={styles.descriptionInput}
+              placeholder="Please describe what happened..."
+              placeholderTextColor="#999"
+              value={reportDescription}
+              onChangeText={setReportDescription}
+              multiline
+              numberOfLines={4}
+              maxLength={500}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setReportModalVisible(false);
+                  setSelectedReason("");
+                  setReportDescription("");
+                }}
+                disabled={submittingReport}
+              >
+                <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.submitButton,
+                  submittingReport && styles.submitButtonDisabled,
+                ]}
+                onPress={handleSubmitReport}
+                disabled={submittingReport}
+              >
+                <ThemedText style={styles.submitButtonText}>
+                  {submittingReport ? "Submitting..." : "Submit Report"}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 };
@@ -246,9 +370,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-  completeButton: {
-    color: "#4CAF50",
-    fontSize: 16,
+  reportButton: {
+    color: "#FF6B6B",
+    fontSize: 14,
     fontWeight: "600",
   },
   emptyState: {
@@ -342,5 +466,101 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "600",
     fontSize: 15,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 20,
+  },
+  reasonsScroll: {
+    maxHeight: 250,
+    marginBottom: 16,
+  },
+  reasonOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: "#f5f5f5",
+  },
+  reasonOptionSelected: {
+    backgroundColor: "#E3F2FD",
+    borderWidth: 2,
+    borderColor: "#4A90E2",
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#4A90E2",
+    marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#4A90E2",
+  },
+  reasonText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  descriptionInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 100,
+    textAlignVertical: "top",
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#f5f5f5",
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontWeight: "600",
+  },
+  submitButton: {
+    backgroundColor: "#FF6B6B",
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#ccc",
+  },
+  submitButtonText: {
+    color: "white",
+    fontWeight: "600",
   },
 });

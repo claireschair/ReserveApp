@@ -32,7 +32,7 @@ const DonationList = () => {
     deleteDonation,
   } = useMatch();
 
-  const { getOrCreateChat } = useChat();
+  const { getOrCreateChat, getChatByMatchId, closeChat } = useChat();
   const { user } = useContext(UserContext);
   
   const [donations, setDonations] = useState([]);
@@ -216,13 +216,24 @@ const DonationList = () => {
   const handleDismissMatch = async (requestId) => {
     Alert.alert(
       "Complete Match",
-      "Mark as completed after successfully exchanging items.",
+      "Mark as completed after successfully exchanging items. This will close the chat.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Complete",
           onPress: async () => {
             try {
+              const donation = donations.find(d => d.id === requestId);
+              if (donation) {
+                const match = donation.matches?.find(m => m.status === "matched");
+                if (match) {
+                  const chat = await getChatByMatchId(requestId);
+                  if (chat) {
+                    await closeChat(chat.id);
+                  }
+                }
+              }
+              
               await completeMatch(requestId);
               Alert.alert("Match Completed!", "Thank you!");
             } catch (err) {
