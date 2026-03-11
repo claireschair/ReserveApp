@@ -1,5 +1,5 @@
-import { StyleSheet, Text, Keyboard, TouchableWithoutFeedback, TextInput, View } from 'react-native'
-import { Link } from 'expo-router'
+import { StyleSheet, Text, Keyboard, TouchableWithoutFeedback, View } from 'react-native'
+import { Link, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Colors } from '../../constants/Colors'
 
@@ -14,66 +14,70 @@ const Login = () => {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState()
-
-
-  const {login} = useUser()
+  const { login } = useUser()
+  const router = useRouter()
 
   const handleSubmit = async () => {
     setError(null)
-
     try {
       await login(email, password)
-    } catch(error) {
+    } catch (error) {
+      // Redirect unverified users straight to the verify-email screen
+      if (error.code === "auth/email-not-verified") {
+        router.push({
+          pathname: "/(auth)/verify-email",
+          params: { email, password },
+        })
+        return
+      }
       setError(error.message)
-
     }
   }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <ThemedView style={styles.container}>
-      <View style={styles.card}>
-        <Spacer />
-        <ThemedText title={true} style={styles.title}>
-          Login to Your Account
-        </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          Welcome back 👋
-        </ThemedText>
-        {/* <TextInput placeholder="Email" /> */}
-
-        <Spacer />
-        <ThemedTextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-        />
-
-        <ThemedTextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <ThemedButton onPress={handleSubmit} style={styles.loginButton}>
-          <Text style={{ color: '#f2f2f2' }}>Login</Text>
-        </ThemedButton>
-
-        <Spacer />
-        {error && <Text style={styles.error}>{error}</Text>}
-
-
-        <Spacer height={100} />
-        <Link href="/register" replace>
-          <ThemedText style={{ textAlign: "center" }}>
-            Register instead
+        <View style={styles.card}>
+          <Spacer />
+          <ThemedText title={true} style={styles.title}>
+            Login to Your Account
           </ThemedText>
-        </Link>
-      </View>
+          <ThemedText style={styles.subtitle}>
+            Welcome back 👋
+          </ThemedText>
+
+          <Spacer />
+          <ThemedTextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <ThemedTextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          <ThemedButton onPress={handleSubmit} style={styles.loginButton}>
+            <Text style={{ color: '#f2f2f2' }}>Login</Text>
+          </ThemedButton>
+
+          <Spacer />
+          {error && <Text style={styles.error}>{error}</Text>}
+
+          <Spacer height={100} />
+          <Link href="/register" replace>
+            <ThemedText style={{ textAlign: "center" }}>
+              Register instead
+            </ThemedText>
+          </Link>
+        </View>
       </ThemedView>
     </TouchableWithoutFeedback>
   )
@@ -100,7 +104,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginBottom: 25,
   },
-   error: {
+  error: {
     color: Colors.warning,
     padding: 10,
     backgroundColor: '#f5c1c8',
@@ -108,6 +112,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 6,
     marginHorizontal: 10,
+    textAlign: "center",
   },
   card: {
     backgroundColor: "#ffffff",
@@ -116,7 +121,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 25,
     borderRadius: 30,
     alignItems: "center",
-
     shadowColor: "#4A90E2",
     shadowOpacity: 0.15,
     shadowRadius: 20,

@@ -5,6 +5,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendEmailVerification,
+  reload,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
 import {
@@ -18,10 +20,9 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Listen to Firebase auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
+      if (firebaseUser && firebaseUser.emailVerified) {
         await loadUserProfile(firebaseUser);
       } else {
         setUser(null);
@@ -45,13 +46,29 @@ export function UserProvider({ children }) {
   }
 
   async function login(email, password) {
-    await signInWithEmailAndPassword(auth, email, password);
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+
+    // Force a fresh token fetch from Firebase servers (bypasses local cache)
+    await credential.user.getIdToken(true);
+    await reload(credential.user);
+
+    if (!credential.user.emailVerified) {
+      await signOut(auth);
+      const err = new Error("Please verify your email before logging in.");
+      err.code = "auth/email-not-verified";
+      err.email = email;
+      err.password = password;
+      throw err;
+    }
+
+    await loadUserProfile(credential.user);
   }
 
   async function register(email, password, name, label, school) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     const uid = credential.user.uid;
 
+    // 1. Save to Firestore
     await setDoc(doc(db, "users", uid), {
       uid,
       name,
@@ -62,6 +79,35 @@ export function UserProvider({ children }) {
       notificationsEnabled: true,
       createdAt: Timestamp.now(),
     });
+
+    // 2. Send verification email BEFORE signing out (must be signed in)
+    try {
+      await sendEmailVerification(credential.user);
+      console.log("Verification email sent to:", email);
+    } catch (err) {
+      console.error("Failed to send verification email:", err.code, err.message);
+      throw new Error("Account created but we couldn't send the verification email. Try logging in to resend.");
+    }
+
+    // 3. Sign out AFTER email is sent
+    await signOut(auth);
+  }
+
+  // Called from the verify-email screen's Resend button
+  async function resendVerificationEmail(email, password) {
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    await reload(credential.user);
+
+    if (credential.user.emailVerified) {
+      // Already verified — load them in properly
+      await loadUserProfile(credential.user);
+      return { alreadyVerified: true };
+    }
+
+    await sendEmailVerification(credential.user);
+    console.log("Resent verification email to:", email);
+    await signOut(auth);
+    return { alreadyVerified: false };
   }
 
   async function logout() {
@@ -69,7 +115,6 @@ export function UserProvider({ children }) {
     setUser(null);
   }
 
-  // Push notifications
   useEffect(() => {
     if (user?.uid) {
       setupPushNotifications();
@@ -88,7 +133,7 @@ export function UserProvider({ children }) {
   }
 
   return (
-    <UserContext.Provider value={{ user, authChecked, login, logout, register }}>
+    <UserContext.Provider value={{ user, authChecked, login, logout, register, resendVerificationEmail }}>
       {children}
     </UserContext.Provider>
   );
