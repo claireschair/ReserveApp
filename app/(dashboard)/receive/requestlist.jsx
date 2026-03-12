@@ -34,7 +34,7 @@ const RequestList = () => {
     deleteRequest,
   } = useMatch();
 
-  const { getOrCreateChat } = useChat();
+  const { getOrCreateChat, getChatByMatchId, closeChat } = useChat();
   const { user } = useContext(UserContext);
   
   const [requests, setRequests] = useState([]);
@@ -235,7 +235,7 @@ const RequestList = () => {
   const handleOpenChat = async (requestId, match) => {
     try {
       const chat = await getOrCreateChat(
-        match.partner.id,
+        requestId,
         match.partner.userId,
         {
           myEmail: match.myContact.email,
@@ -259,13 +259,24 @@ const RequestList = () => {
   const handleDismissMatch = async (requestId) => {
     Alert.alert(
       "Complete Match",
-      "Mark as completed after successfully exchanging items.",
+      "Mark as completed after successfully exchanging items. This will close the chat.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Complete",
           onPress: async () => {
             try {
+              const request = requests.find(r => r.id === requestId);
+              if (request) {
+                const match = request.matches?.find(m => m.status === "matched");
+                if (match) {
+                  const chat = await getChatByMatchId(requestId);
+                  if (chat) {
+                    await closeChat(chat.id);
+                  }
+                }
+              }
+              
               await completeMatch(requestId);
               Alert.alert("Match Completed!", "Thank you for using our service!");
             } catch (err) {
