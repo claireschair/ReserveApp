@@ -12,6 +12,8 @@ import {
   ScrollView,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../lib/firebase";
 import { useChat } from "../../hooks/useChat";
 import { useReport } from "../../hooks/useReport";
 import { UserContext } from "../../contexts/UserContext";
@@ -43,16 +45,36 @@ const ChatScreen = () => {
   const [reportDescription, setReportDescription] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
   const [partnerUserId, setPartnerUserId] = useState(null);
+  const [chatData, setChatData] = useState(null);
   const flatListRef = useRef(null);
 
+  // Get chat data and partner ID on mount
   useEffect(() => {
-    if (messages.length > 0 && !partnerUserId) {
-      const firstOtherMessage = messages.find(m => m.senderId !== user?.uid);
-      if (firstOtherMessage) {
-        setPartnerUserId(firstOtherMessage.senderId);
+    if (!chatId || !user?.uid) return;
+
+    const loadChatData = async () => {
+      try {
+        const chatDoc = await getDoc(doc(db, "chats", chatId));
+        if (chatDoc.exists()) {
+          const data = chatDoc.data();
+          setChatData(data);
+          
+          // Find partner ID from participants array
+          const partner = data.participants?.find(id => id !== user.uid);
+          if (partner) {
+            console.log("Partner user ID:", partner);
+            setPartnerUserId(partner);
+          } else {
+            console.error("Could not find partner in participants");
+          }
+        }
+      } catch (error) {
+        console.error("Error loading chat data:", error);
       }
-    }
-  }, [messages, user?.uid]);
+    };
+
+    loadChatData();
+  }, [chatId, user?.uid]);
 
   useEffect(() => {
     if (!chatId) return;
