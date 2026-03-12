@@ -235,7 +235,7 @@ const RequestList = () => {
   const handleOpenChat = async (requestId, match) => {
     try {
       const chat = await getOrCreateChat(
-        requestId,
+        match.partner.id,
         match.partner.userId,
         {
           myEmail: match.myContact.email,
