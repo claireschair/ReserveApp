@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useChat } from "../../hooks/useChat";
 import { useReport } from "../../hooks/useReport";
@@ -77,6 +77,37 @@ const ChatScreen = () => {
 
     loadChatData();
   }, [chatId, user?.uid]);
+
+  useEffect(() => {
+    if (!chatId) return;
+
+    const unsubscribe = onSnapshot(
+      doc(db, "chats", chatId),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          
+          if (data.status === "closed") {
+            Alert.alert(
+              "Chat Closed",
+              "This chat has been closed.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => router.back(),
+                },
+              ]
+            );
+          }
+        }
+      },
+      (error) => {
+        console.error("Error listening to chat status:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [chatId]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -251,7 +282,7 @@ const ChatScreen = () => {
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Match Chat</ThemedText>
         <TouchableOpacity onPress={handleOpenReportModal}>
-          <ThemedText style={styles.reportButton}>🚩 Report</ThemedText>
+          <ThemedText style={styles.reportButton}>Report</ThemedText>
         </TouchableOpacity>
       </View>
 
