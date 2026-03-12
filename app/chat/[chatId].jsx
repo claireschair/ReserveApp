@@ -16,6 +16,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useChat } from "../../hooks/useChat";
 import { useReport } from "../../hooks/useReport";
+import { useMatch } from "../../hooks/useMatch";
 import { UserContext } from "../../contexts/UserContext";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
@@ -34,8 +35,9 @@ const REPORT_REASONS = [
 const ChatScreen = () => {
   const { chatId, matchId } = useLocalSearchParams();
   const { user } = useContext(UserContext);
-  const { subscribeToMessages, sendMessage, markMessagesAsRead } = useChat();
+  const { subscribeToMessages, sendMessage, markMessagesAsRead, closeChat } = useChat();
   const { submitReport, hasReported } = useReport();
+  const { completeMatch } = useMatch();
   
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
@@ -48,6 +50,7 @@ const ChatScreen = () => {
   const [chatData, setChatData] = useState(null);
   const flatListRef = useRef(null);
 
+  // Get chat data and partner ID on mount
   useEffect(() => {
     if (!chatId || !user?.uid) return;
 
@@ -58,6 +61,7 @@ const ChatScreen = () => {
           const data = chatDoc.data();
           setChatData(data);
           
+          // Find partner ID from participants array
           const partner = data.participants?.find(id => id !== user.uid);
           if (partner) {
             console.log("Partner user ID:", partner);
@@ -157,9 +161,17 @@ const ChatScreen = () => {
         }
       );
 
+      if (chatId) {
+        await closeChat(chatId);
+      }
+
+      if (matchId) {
+        await completeMatch(matchId);
+      }
+
       Alert.alert(
         "Report Submitted",
-        "Thank you for reporting this issue. Our moderators will review it and take appropriate action.",
+        "Thank you for reporting this issue. The chat has been closed and the match has been completed. Our moderators will review your report.",
         [
           {
             text: "OK",
@@ -167,6 +179,7 @@ const ChatScreen = () => {
               setReportModalVisible(false);
               setSelectedReason("");
               setReportDescription("");
+              router.back();
             },
           },
         ]
@@ -238,7 +251,7 @@ const ChatScreen = () => {
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Match Chat</ThemedText>
         <TouchableOpacity onPress={handleOpenReportModal}>
-          <ThemedText style={styles.reportButton}>Report</ThemedText>
+          <ThemedText style={styles.reportButton}>🚩 Report</ThemedText>
         </TouchableOpacity>
       </View>
 
