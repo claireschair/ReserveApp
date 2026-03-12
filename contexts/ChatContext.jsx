@@ -38,7 +38,7 @@ export function ChatProvider({ children }) {
 
       const chatData = {
         matchId,
-        participants: [userId, partnerId].sort(), 
+        participants: [userId, partnerId].sort(),
         participantEmails: {
           [userId]: contactInfo.myEmail,
           [partnerId]: contactInfo.partnerEmail,

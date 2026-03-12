@@ -48,7 +48,6 @@ const ChatScreen = () => {
   const [chatData, setChatData] = useState(null);
   const flatListRef = useRef(null);
 
-  // Get chat data and partner ID on mount
   useEffect(() => {
     if (!chatId || !user?.uid) return;
 
@@ -59,7 +58,6 @@ const ChatScreen = () => {
           const data = chatDoc.data();
           setChatData(data);
           
-          // Find partner ID from participants array
           const partner = data.participants?.find(id => id !== user.uid);
           if (partner) {
             console.log("Partner user ID:", partner);
