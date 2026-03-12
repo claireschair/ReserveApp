@@ -244,12 +244,11 @@ const ChatScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {messages.length === 0 ? (
-        <View style={styles.emptyState}>
-          <ThemedText style={styles.emptyText}>No messages yet</ThemedText>
-          <ThemedText style={styles.emptySubtext}>Start the conversation!</ThemedText>
-        </View>
-      ) : (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        style={{ flex: 1 }}
+      >
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -260,13 +259,14 @@ const ChatScreen = () => {
           onContentSizeChange={() =>
             flatListRef.current?.scrollToEnd({ animated: true })
           }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <ThemedText style={styles.emptyText}>No messages yet</ThemedText>
+              <ThemedText style={styles.emptySubtext}>Start the conversation!</ThemedText>
+            </View>
+          }
         />
-      )}
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -276,6 +276,8 @@ const ChatScreen = () => {
             placeholderTextColor="#999"
             multiline
             maxLength={1000}
+            returnKeyType="default"
+            blurOnSubmit={false}
           />
           <TouchableOpacity
             style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
@@ -295,73 +297,82 @@ const ChatScreen = () => {
         transparent={true}
         onRequestClose={() => setReportModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ThemedText style={styles.modalTitle}>Report User</ThemedText>
-            <ThemedText style={styles.modalSubtitle}>
-              Help us keep the community safe. What's the issue?
-            </ThemedText>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+          >
+            <View style={styles.modalContent}>
+              <ThemedText style={styles.modalTitle}>Report User</ThemedText>
+              <ThemedText style={styles.modalSubtitle}>
+                Help us keep the community safe. What's the issue?
+              </ThemedText>
 
-            <ScrollView style={styles.reasonsScroll}>
-              {REPORT_REASONS.map((reason) => (
+              <ScrollView style={styles.reasonsScroll}>
+                {REPORT_REASONS.map((reason) => (
+                  <TouchableOpacity
+                    key={reason.value}
+                    style={[
+                      styles.reasonOption,
+                      selectedReason === reason.value && styles.reasonOptionSelected,
+                    ]}
+                    onPress={() => setSelectedReason(reason.value)}
+                  >
+                    <View style={styles.radioButton}>
+                      {selectedReason === reason.value && (
+                        <View style={styles.radioButtonInner} />
+                      )}
+                    </View>
+                    <ThemedText style={styles.reasonText}>{reason.label}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                style={styles.descriptionInput}
+                placeholder="Please describe what happened..."
+                placeholderTextColor="#999"
+                value={reportDescription}
+                onChangeText={setReportDescription}
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalButtons}>
                 <TouchableOpacity
-                  key={reason.value}
-                  style={[
-                    styles.reasonOption,
-                    selectedReason === reason.value && styles.reasonOptionSelected,
-                  ]}
-                  onPress={() => setSelectedReason(reason.value)}
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setReportModalVisible(false);
+                    setSelectedReason("");
+                    setReportDescription("");
+                  }}
+                  disabled={submittingReport}
                 >
-                  <View style={styles.radioButton}>
-                    {selectedReason === reason.value && (
-                      <View style={styles.radioButtonInner} />
-                    )}
-                  </View>
-                  <ThemedText style={styles.reasonText}>{reason.label}</ThemedText>
+                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
 
-            <TextInput
-              style={styles.descriptionInput}
-              placeholder="Please describe what happened..."
-              placeholderTextColor="#999"
-              value={reportDescription}
-              onChangeText={setReportDescription}
-              multiline
-              numberOfLines={4}
-              maxLength={500}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setReportModalVisible(false);
-                  setSelectedReason("");
-                  setReportDescription("");
-                }}
-                disabled={submittingReport}
-              >
-                <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  styles.submitButton,
-                  submittingReport && styles.submitButtonDisabled,
-                ]}
-                onPress={handleSubmitReport}
-                disabled={submittingReport}
-              >
-                <ThemedText style={styles.submitButtonText}>
-                  {submittingReport ? "Submitting..." : "Submit Report"}
-                </ThemedText>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.submitButton,
+                    submittingReport && styles.submitButtonDisabled,
+                  ]}
+                  onPress={handleSubmitReport}
+                  disabled={submittingReport}
+                >
+                  <ThemedText style={styles.submitButtonText}>
+                    {submittingReport ? "Submitting..." : "Submit Report"}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </ThemedView>
   );
@@ -465,13 +476,16 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#fff",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 8,
     maxHeight: 100,
     fontSize: 15,
+    color: "#000",
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   sendButton: {
     backgroundColor: "#4A90E2",
@@ -557,6 +571,8 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: "top",
     marginBottom: 16,
+    backgroundColor: "#fff",
+    color: "#000",
   },
   modalButtons: {
     flexDirection: "row",
