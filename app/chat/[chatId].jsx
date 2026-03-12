@@ -48,6 +48,7 @@ const ChatScreen = () => {
   const [submittingReport, setSubmittingReport] = useState(false);
   const [partnerUserId, setPartnerUserId] = useState(null);
   const [chatData, setChatData] = useState(null);
+  const [iClosedChat, setIClosedChat] = useState(false);
   const flatListRef = useRef(null);
 
   // Get chat data and partner ID on mount
@@ -87,10 +88,10 @@ const ChatScreen = () => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           
-          if (data.status === "closed") {
+          if (data.status === "closed" && !iClosedChat) {
             Alert.alert(
               "Chat Closed",
-              "This chat has been closed.",
+              "This chat has been closed because you have been reported for violating community guidelines.",
               [
                 {
                   text: "OK",
@@ -107,7 +108,7 @@ const ChatScreen = () => {
     );
 
     return () => unsubscribe();
-  }, [chatId]);
+  }, [chatId, iClosedChat]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -192,6 +193,8 @@ const ChatScreen = () => {
         }
       );
 
+      setIClosedChat(true);
+
       if (chatId) {
         await closeChat(chatId);
       }
@@ -200,18 +203,17 @@ const ChatScreen = () => {
         await completeMatch(matchId);
       }
 
+      setReportModalVisible(false);
+      setSelectedReason("");
+      setReportDescription("");
+
       Alert.alert(
         "Report Submitted",
         "Thank you for reporting this issue. The chat has been closed and the match has been completed. Our moderators will review your report.",
         [
           {
             text: "OK",
-            onPress: () => {
-              setReportModalVisible(false);
-              setSelectedReason("");
-              setReportDescription("");
-              router.back();
-            },
+            onPress: () => router.back(),
           },
         ]
       );
