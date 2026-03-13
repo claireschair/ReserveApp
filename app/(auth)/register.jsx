@@ -139,7 +139,9 @@ const Register = () => {
             <ThemedText style={styles.subtitle}>
               Join Reserve Today ✨
             </ThemedText>
-            <Spacer />
+
+            <Spacer height={10} />
+
             {/* NAME */}
             <ThemedTextInput
               style={styles.input}
@@ -253,7 +255,6 @@ const Register = () => {
               <Text style={{ color: "#f2f2f2" }}>Register</Text>
             </ThemedButton>
 
-            <Spacer />
 
             {error && <Text style={styles.error}>{error}</Text>}
 
@@ -289,7 +290,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#ffffff",
     width: "85%",
-    paddingVertical: 40,
+    //paddingVertical: 20,
     paddingHorizontal: 25,
     borderRadius: 30,
     alignItems: "center",

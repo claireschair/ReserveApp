@@ -61,21 +61,24 @@ const Receive = () => {
 
         <Spacer height={30} />
 
+
         <View style={styles.buttonsContainer}>
           {buttons.map((btn, idx) => (
-            <View key={idx} style={styles.buttonWithDesc}>
+            <TouchableOpacity
+              key={idx}
+              style={styles.buttonWithDesc}
+              activeOpacity={0.85}
+              onPress={() => router.push(btn.route)}
+            >
               <View style={styles.descContainer}>
                 <ThemedText style={styles.buttonLabel}>{btn.label}</ThemedText>
                 <ThemedText style={styles.description}>{btn.description}</ThemedText>
               </View>
-              <TouchableOpacity
-                style={styles.squareButton}
-                activeOpacity={0.85}
-                onPress={() => router.push(btn.route)}
-              >
+        
+              <View style={styles.squareButton}>
                 <Ionicons name={btn.icon} size={50} color="#fff" />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           ))}
         </View>
 
