@@ -87,7 +87,7 @@ const Wishlist = () => {
 
   return (
     <ThemedView style={styles.pageContainer}>
-      <Spacer height={70} />
+      <Spacer height={100} />
       <View style={styles.headerCard}>
         <ThemedText style={styles.heading}>
           Teachers' Wishlists

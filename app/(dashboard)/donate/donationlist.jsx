@@ -285,7 +285,7 @@ const DonationList = () => {
 
   return (
     <ThemedView style={styles.container}>
-      <Spacer height={70} />
+      <Spacer height={100} />
       <View style={styles.headerCard}>
         <ThemedText title style={styles.heading}>
           My Donations

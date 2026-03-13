@@ -3,8 +3,11 @@ import {
   TouchableOpacity,
   TextInput,
   View,
+  Keyboard,
+  Animated,
+  Platform,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import MapView, { Marker } from "react-native-maps";
 
 import ThemedView from "../../../components/ThemedView";
@@ -24,6 +27,9 @@ const SelectDonationLocation = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Animated bottom value
+  const animatedBottom = useRef(new Animated.Value(20)).current;
+
   const handleAddItem = () => {
     if (itemInput.trim()) {
       setItems([...items, itemInput.trim()]);
@@ -37,27 +43,22 @@ const SelectDonationLocation = () => {
 
   const handleSubmit = async () => {
     setError(null);
-
     if (!location || !placeName) {
       setError("Please type the address of the donation center.");
       return;
     }
-
     try {
       setLoading(true);
-
       await saveDonationCenter(items, {
         name: placeName,
         lat: location.latitude,
         lng: location.longitude,
         verified: false,
       });
-
       setItems([]);
       setItemInput("");
       setLocation(null);
       setPlaceName(null);
-
       alert("Donation center added!");
     } catch (err) {
       setError(err.message || "Something went wrong.");
@@ -65,6 +66,34 @@ const SelectDonationLocation = () => {
       setLoading(false);
     }
   };
+
+  const handleFocus = (e) => {
+    const keyboardHeight = e?.endCoordinates?.height || 250;
+    const finalHeight = Math.min(keyboardHeight, 250);
+    Animated.timing(animatedBottom, {
+      toValue: finalHeight + 20,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleBlur = () => {
+    Animated.timing(animatedBottom, {
+      toValue: 20,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", handleFocus);
+    const hideSub = Keyboard.addListener("keyboardDidHide", handleBlur);
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   return (
     <ThemedView style={styles.container}>
@@ -94,16 +123,12 @@ const SelectDonationLocation = () => {
         {location && <Marker coordinate={location} title={placeName} />}
       </MapView>
 
-      <View style={styles.form}>
-        <ThemedText style={styles.label}>
-          Items Accepted (Optional):
-        </ThemedText>
+      <Animated.View style={[styles.form, { bottom: animatedBottom }]}>
+        <ThemedText style={styles.label}>Items Accepted (Optional):</ThemedText>
         <Spacer height={4} />
         {placeName && (
-            <ThemedText style={styles.locationText}>
-              📍 {placeName}
-            </ThemedText>
-          )}
+          <ThemedText style={styles.locationText}>📍 {placeName}</ThemedText>
+        )}
         <Spacer height={3} />
 
         <View style={styles.itemInputWrapper}>
@@ -114,11 +139,10 @@ const SelectDonationLocation = () => {
             onChangeText={setItemInput}
             onSubmitEditing={handleAddItem}
             returnKeyType="done"
+            onFocus={handleFocus} 
+            onBlur={handleBlur}   
           />
-          <TouchableOpacity 
-            style={styles.addButton} 
-            onPress={handleAddItem}
-          >
+          <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
             <ThemedText style={styles.addButtonText}>Add</ThemedText>
           </TouchableOpacity>
         </View>
@@ -149,7 +173,17 @@ const SelectDonationLocation = () => {
             {loading ? "Adding..." : "Add Donation Center"}
           </ThemedText>
         </TouchableOpacity>
-      </View>
+
+                {/* Optional Hide Keyboard button */}
+        <TouchableOpacity
+          onPress={Keyboard.dismiss}
+          style={{ marginTop: 10 }}
+        >
+          <ThemedText style={{ color: "#4A90E2", textAlign: "center" }}>
+            Hide Keyboard
+          </ThemedText>
+        </TouchableOpacity>
+      </Animated.View>
     </ThemedView>
   );
 };
