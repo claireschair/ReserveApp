@@ -14,6 +14,7 @@ import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
 import Spacer from "../../../components/Spacer";
 import { useMap } from "../../../hooks/useMap";
+import { Ionicons } from "@expo/vector-icons";
 
 import PlaceSearchInput from "./PlaceSearchInput";
 
@@ -26,8 +27,9 @@ const SelectDonationLocation = () => {
   const [placeName, setPlaceName] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-  // Animated bottom value
   const animatedBottom = useRef(new Animated.Value(20)).current;
 
   const handleAddItem = () => {
@@ -103,7 +105,20 @@ const SelectDonationLocation = () => {
             setPlaceName(name);
             setLocation({ latitude, longitude });
           }}
+          onFocus={(e) => { setIsInputFocused(true); handleFocus(e);}}
+          onBlur={() => { setIsInputFocused(false); handleBlur();}}  
         />
+          {isSearchFocused && (
+              <TouchableOpacity
+                onPress={Keyboard.dismiss}
+                style={styles.hideKeyboardTopAbsolute}
+              >
+                <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" /> 
+                <ThemedText style={styles.hideKeyboardText}>
+                  Hide Keyboard
+                </ThemedText>
+              </TouchableOpacity>
+          )}
         <ThemedText style={styles.subtitle}>
           Select a location on the map and list items accepted
         </ThemedText>
@@ -139,8 +154,8 @@ const SelectDonationLocation = () => {
             onChangeText={setItemInput}
             onSubmitEditing={handleAddItem}
             returnKeyType="done"
-            onFocus={handleFocus} 
-            onBlur={handleBlur}   
+            onFocus={(e) => { setIsInputFocused(true); handleFocus(e);}}
+            onBlur={() => { setIsInputFocused(false); handleBlur();}}  
           />
           <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
             <ThemedText style={styles.addButtonText}>Add</ThemedText>
@@ -174,15 +189,17 @@ const SelectDonationLocation = () => {
           </ThemedText>
         </TouchableOpacity>
 
-                {/* Optional Hide Keyboard button */}
-        <TouchableOpacity
-          onPress={Keyboard.dismiss}
-          style={{ marginTop: 10 }}
-        >
-          <ThemedText style={{ color: "#4A90E2", textAlign: "center" }}>
-            Hide Keyboard
-          </ThemedText>
-        </TouchableOpacity>
+        {(isInputFocused || isSearchFocused) && (
+          <TouchableOpacity
+            onPress={Keyboard.dismiss}
+            style={styles.hideKeyboard}
+          >
+            <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" /> 
+            <ThemedText style={styles.hideKeyboardText}>
+              Hide Keyboard
+            </ThemedText>
+          </TouchableOpacity>
+        )}
       </Animated.View>
     </ThemedView>
   );
@@ -306,5 +323,33 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontWeight: "600",
     color: "#1f2937",
+  },
+  hideKeyboard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: 10,
+    gap: 4,
+  },
+  hideKeyboardTopAbsolute: {
+    position: "absolute",
+    top: 50,
+    left: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    zIndex: 2000,  
+    backgroundColor: "white",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  hideKeyboardText: {
+    color: "#4A90E2",
   },
 });

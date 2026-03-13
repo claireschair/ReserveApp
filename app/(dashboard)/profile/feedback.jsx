@@ -1,5 +1,6 @@
-import { StyleSheet, TextInput, TouchableOpacity, Keyboard, View } from "react-native";
+import { StyleSheet, TextInput, TouchableOpacity, Keyboard, View, KeyboardAvoidingView, Platform } from "react-native";
 import React, { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
@@ -33,123 +34,196 @@ const Feedback = () => {
   };
 
   return (
+    <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
     <ThemedView style={styles.container}>
-      <ThemedText title style={styles.heading}>
-        Feedback Form
-      </ThemedText>
 
-      <Spacer />
+      <View style={styles.header}>
+        <Ionicons name="chatbubble-ellipses-outline" size={34} color="#4A90E2" />
+        <ThemedText title style={styles.heading}>
+          Share Your Feedback
+        </ThemedText>
+        <ThemedText style={styles.subtitle}>
+          Your feedback helps us improve the app experience.
+        </ThemedText>
+      </View>
 
-      <ThemedText>Rate your experience:</ThemedText>
-      <Spacer height={10} />
+      {/* Card */}
+      <View style={styles.card}>
 
-      <ThemedView style={styles.stars}>
-        {[1, 2, 3, 4, 5].map((num) => (
-          <TouchableOpacity key={num} onPress={() => setRating(num)}>
-            <ThemedText style={[styles.star, rating >= num && styles.starSelected]}>
-              ★
+        <ThemedText style={styles.label}>
+          How was your experience?
+        </ThemedText>
+
+        <Spacer height={10} />
+
+        <View style={styles.stars}>
+          {[1,2,3,4,5].map((num) => (
+            <TouchableOpacity
+              key={num}
+              onPress={() => setRating(num)}
+              style={styles.starButton}
+            >
+              <Ionicons
+                name={rating >= num ? "star" : "star-outline"}
+                size={36}
+                color={rating >= num ? "#FFD166" : "#D1D5DB"}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Spacer height={20} />
+
+        <ThemedText style={styles.label}>
+          Tell us more
+        </ThemedText>
+
+        <Spacer height={6} />
+
+        <TextInput
+          style={styles.input}
+          placeholder="What did you like? What could be better?"
+          placeholderTextColor="#9CA3AF"
+          value={feedback}
+          onChangeText={setFeedback}
+          multiline
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
+
+        {isFocused && (
+          <TouchableOpacity
+            style={styles.keyboardButton}
+            onPress={Keyboard.dismiss}
+          >
+            <Ionicons name="chevron-down-outline" size={16} color="#4A90E2"/>
+            <ThemedText style={styles.keyboardButtonText}>
+              Hide Keyboard
             </ThemedText>
           </TouchableOpacity>
-        ))}
-      </ThemedView>
+        )}
 
-      <Spacer height={20} />
+        {error && (
+          <>
+            <Spacer height={8} />
+            <ThemedText style={styles.error}>{error}</ThemedText>
+          </>
+        )}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Write your feedback..."
-        value={feedback}
-        onChangeText={setFeedback}
-        multiline
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-      />
+        <Spacer height={18} />
 
-      {isFocused && (
-        <View style={styles.keyboardButtonWrapper}>
-          <TouchableOpacity style={styles.keyboardButton} onPress={Keyboard.dismiss}>
-            <ThemedText style={styles.keyboardButtonText}>Hide Keyboard ⬇︎</ThemedText>
-          </TouchableOpacity>
-        </View>
-      )}
+        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+          <ThemedText style={styles.buttonText}>
+            Submit Feedback
+          </ThemedText>
+        </TouchableOpacity>
 
-      <Spacer height={15} />
-
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
-      <Spacer height={10} />
-
-      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-        <ThemedText style={styles.buttonText}>Submit</ThemedText>
-      </TouchableOpacity>
+      </View>
     </ThemedView>
+    </KeyboardAvoidingView>
   );
 };
 
 export default Feedback;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+
+  container:{
+    flex:1,
+    padding:20,
+    justifyContent:"center"
   },
-  heading: {
-    fontWeight: "bold",
-    fontSize: 22,
+
+  header:{
+    alignItems:"center",
+    marginBottom:20
+  },
+
+  heading:{
+    fontSize:24,
+    fontWeight:"700",
+    marginTop:8
+  },
+
+  subtitle:{
+    fontSize:14,
+    opacity:0.7,
+    marginTop:4,
+    textAlign:"center"
+  },
+
+  card:{
+    backgroundColor:"#ffffff",
+    padding:22,
+    borderRadius:26,
+
+    shadowColor:"#4A90E2",
+    shadowOpacity:0.15,
+    shadowRadius:20,
+    shadowOffset:{width:0,height:10},
+    elevation:8
+  },
+
+  label:{
+    fontSize:16,
+    fontWeight:"600",
+    color:"#374151",
     textAlign: "center",
   },
-  stars: {
-    flexDirection: "row",
+
+  stars:{
+    flexDirection:"row",
+    justifyContent:"center"
   },
-  star: {
-    fontSize: 40,
-    marginHorizontal: 5,
-    color: "#888",
+
+  starButton:{
+    marginHorizontal:4
   },
-  starSelected: {
-    color: "gold",
+
+  input:{
+    minHeight:120,
+    paddingVertical:14,
+    paddingHorizontal:16,
+    borderRadius:18,
+    backgroundColor:"#F3F6FB",
+    borderWidth:1,
+    borderColor:"#E0E7FF",
+    fontSize:15,
+    textAlignVertical:"top"
   },
-  input: {
-    width: "90%",
-    height: 120,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    padding: 10,
-    textAlignVertical: "top",
-    backgroundColor: "white",
+
+  keyboardButton:{
+    flexDirection:"row",
+    alignItems:"center",
+    alignSelf:"flex-end",
+    marginTop:8,
+    gap:4
   },
-  keyboardButtonWrapper: {
-    width: "90%",
-    alignItems: "flex-end",
-    marginTop: 8,
+
+  keyboardButtonText:{
+    color:"#4A90E2",
+    fontWeight:"500"
   },
-  keyboardButton: {
-    backgroundColor: "#ddd",
-    paddingVertical: 6,
-    paddingHorizontal: 15,
-    borderRadius: 8,
+
+  button:{
+    backgroundColor:"#4A90E2",
+    paddingVertical:14,
+    borderRadius:22
   },
-  keyboardButtonText: {
-    fontSize: 14,
-    color: "#333",
+
+  buttonText:{
+    color:"white",
+    textAlign:"center",
+    fontSize:16,
+    fontWeight:"600"
   },
-  error: {
-    color: "red",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 12,
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
+
+  error:{
+    color:"red",
+    textAlign:"center"
+  }
+
 });

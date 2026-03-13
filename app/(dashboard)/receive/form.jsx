@@ -7,6 +7,8 @@ import {
   TouchableWithoutFeedback,
   Alert,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import React, { useState } from "react";
 import Spacer from "../../../components/Spacer";
@@ -16,6 +18,7 @@ import ThemedTextInput from "../../../components/ThemedTextInput";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useMatch } from "../../../hooks/useMatch";
+import { Ionicons } from "@expo/vector-icons";
 
 const ReceiveForm = () => {
   const [selectedItems, setSelectedItems] = useState([]);
@@ -26,6 +29,9 @@ const ReceiveForm = () => {
   const [zipCode, setZipCode] = useState("");
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
+
+  const [isOtherInputFocused, setIsOtherInputFocused] = useState(false);
+  const [isZipFocused, setIsZipFocused] = useState(false);
 
   const { saveRequest } = useMatch();
   const router = useRouter();
@@ -173,6 +179,11 @@ const ReceiveForm = () => {
   return (
     <ThemedView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, width: "100%" }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        //keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 80} 
+      >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <Spacer height={90} />
           <ThemedText title style={styles.heading}>
@@ -209,6 +220,8 @@ const ReceiveForm = () => {
                         placeholder="1"
                         selectTextOnFocus={true}
                         placeholderTextColor="#999"
+                        onFocus={() => setIsOtherInputFocused(true)}
+                        onBlur={() => setIsOtherInputFocused(false)}
                       />
                     </View>
                   )}
@@ -262,11 +275,23 @@ const ReceiveForm = () => {
               onSubmitEditing={handleAddOtherItem}
               returnKeyType="done"
               placeholderTextColor="#999"
+              onFocus={() => setIsOtherInputFocused(true)}
+              onBlur={() => setIsOtherInputFocused(false)}
             />
             <TouchableOpacity style={styles.addButton} onPress={handleAddOtherItem}>
               <ThemedText style={styles.addButtonText}>Add</ThemedText>
             </TouchableOpacity>
           </View>
+
+          {isOtherInputFocused && (
+            <TouchableOpacity
+              style={styles.hideKeyboardFloating}
+              onPress={Keyboard.dismiss}
+            >
+              <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
+              <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
+            </TouchableOpacity>
+          )}          
 
           {otherItems.length > 0 && (
             <View style={styles.otherItemsList}>
@@ -315,13 +340,27 @@ const ReceiveForm = () => {
           <Spacer height={10} />
 
           {selectionMethod === "zip" && (
-            <ThemedTextInput
-              style={styles.input}
-              placeholder="Enter Zip Code"
-              value={zipCode}
-              onChangeText={setZipCode}
-              keyboardType="numeric"
-            />
+            <View style={{ width: "100%", alignItems: "center" }}>
+              <ThemedTextInput
+                style={styles.input}
+                placeholder="Enter Zip Code"
+                value={zipCode}
+                onChangeText={setZipCode}
+                keyboardType="numeric"
+                onFocus={() => setIsZipFocused(true)}
+                onBlur={() => setIsZipFocused(false)}
+              />
+
+              {(isZipFocused) && (
+                <TouchableOpacity
+                  style={styles.hideKeyboardFloating}
+                  onPress={Keyboard.dismiss}
+                >
+                  <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
+                  <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
 
           {selectionMethod === "location" && (
@@ -342,6 +381,7 @@ const ReceiveForm = () => {
 
           <Spacer height={20} />
         </ScrollView>
+        </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
     </ThemedView>
   );
@@ -382,7 +422,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     color: "#000",
   },
-  otherInputWrapper: { flexDirection: "row", width: "90%", gap: 10, marginTop: 10 },
+  otherInputWrapper: { flexDirection: "row", width: "90%", gap: 10, marginTop: 10, marginBottom: 15, },
   otherInput: {
     flex: 1,
     backgroundColor: "#fff",
@@ -464,5 +504,25 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     borderWidth: 1,
     borderColor: "#e0e7ff",
+  },
+  hideKeyboardFloating: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    gap: 4,
+  },
+  hideKeyboardText: {
+    color: "#4A90E2",
+    fontWeight: "500",
   },
 });

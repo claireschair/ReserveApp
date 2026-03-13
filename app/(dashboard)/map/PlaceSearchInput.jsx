@@ -12,7 +12,7 @@ import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 
-const PlaceSearchInput = ({ onSelect }) => {
+const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
@@ -53,10 +53,10 @@ const PlaceSearchInput = ({ onSelect }) => {
         `&addressdetails=1` +
         `&limit=5` +
         `${viewbox}` +
-        'kumrnidhi@gmail.com', // Replace with your contact email
+        //'kumrnidhi@gmail.com', // Replace with contact email
         {
           headers: {
-            'User-Agent': 'Reserve' // Replace with your app name
+            "User-Agent": "Reserve (kumrnidhi@gmail.com)" 
           }
         }
       );
@@ -93,6 +93,8 @@ const PlaceSearchInput = ({ onSelect }) => {
           value={query}
           onChangeText={searchPlaces}
           placeholderTextColor="#9CA3AF"
+          onFocus={() => onFocus && onFocus()}
+          onBlur={() => onBlur && onBlur()}
         />
       </View>
 

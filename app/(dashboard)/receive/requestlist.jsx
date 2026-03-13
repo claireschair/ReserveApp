@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext } from "react";
-import { StyleSheet, ScrollView, View, TouchableOpacity, Alert, TextInput, Modal, RefreshControl } from "react-native";
+import { StyleSheet, ScrollView, View, TouchableOpacity, Alert, TextInput, Modal, RefreshControl, Keyboard } from "react-native";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { router } from "expo-router";
 import { db } from "../../../lib/firebase";
@@ -9,6 +9,7 @@ import { UserContext } from "../../../contexts/UserContext";
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
+import { Ionicons } from "@expo/vector-icons";
 
 function getLocationDisplay(locationData) {
   if (!locationData) return "Not provided";
@@ -48,6 +49,7 @@ const RequestList = () => {
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [contactEmail, setContactEmail] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const loadRequests = async () => {
     try {
@@ -345,6 +347,8 @@ const RequestList = () => {
           value={searchText}
           onChangeText={setSearchText}
           placeholderTextColor="#999"
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
         />
         <TouchableOpacity
           style={styles.filterButton}
@@ -353,6 +357,15 @@ const RequestList = () => {
           <ThemedText style={styles.filterButtonText}>{showFilters ? "Hide" : "Filter"}</ThemedText>
         </TouchableOpacity>
       </View>
+      {searchFocused && (
+      <TouchableOpacity
+        style={styles.hideKeyboardButton}
+        onPress={() => Keyboard.dismiss()}
+      >
+        <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" /> 
+        <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
+      </TouchableOpacity>
+      )}
 
       {showFilters && (
         <View style={styles.filtersContainer}>
@@ -632,7 +645,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
     gap: 8,
   },
   searchInput: {
@@ -799,4 +812,25 @@ const styles = StyleSheet.create({
   },
   modalHint: { fontSize: 14, color: "#666", marginBottom: 10 },
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },
+  hideKeyboardButton: {
+    flexDirection: "row",
+    alignSelf: "flex-end",           // aligns right
+    backgroundColor: "rgba(255,255,255,0.8)", // semi-transparent
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    marginBottom: 20,
+  },
+  hideKeyboardText: {
+    color: "#4A90E2",
+    fontSize: 13,
+    fontWeight: "500",
+  },
 });

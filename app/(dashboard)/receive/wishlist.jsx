@@ -1,4 +1,4 @@
-import { StyleSheet, TextInput, TouchableOpacity, View, Keyboard, Alert } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, View, Keyboard, Alert, KeyboardAvoidingView, Platform, ScrollView, } from 'react-native';
 import { useState, useEffect, useContext } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -88,6 +88,11 @@ const Wishlist = () => {
 
   return (
     <ThemedView style={styles.container}>
+    <KeyboardAvoidingView
+          style={{ flex: 1, width: "100%" }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}            
+    >
+      <ScrollView  contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <Spacer height={110} />
       <View style={styles.headerCard}>
         <ThemedText style={styles.heading}>
@@ -195,7 +200,8 @@ const Wishlist = () => {
           {isFocused && (
             <View style={styles.keyboardButtonWrapper}>
               <TouchableOpacity style={styles.keyboardButton} onPress={Keyboard.dismiss}>
-                <ThemedText style={styles.keyboardButtonText}>Hide Keyboard ⬇︎</ThemedText>
+                <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" /> 
+                <ThemedText style={styles.keyboardButtonText}>Hide Keyboard</ThemedText>
               </TouchableOpacity>
             </View>
           )}
@@ -218,6 +224,8 @@ const Wishlist = () => {
       )}
 
       <Spacer />
+      </ScrollView>
+    </KeyboardAvoidingView>
     </ThemedView>
   );
 };
@@ -236,6 +244,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+  scrollContent: { padding: 0},
   emptyState: {
     alignItems: "center",
   },
@@ -348,19 +357,31 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   keyboardButtonWrapper: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     marginTop: 10,
+    gap: 4,
   },
   keyboardButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "white",
+    //position: "absolute",
+    left: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    zIndex: 2000,  
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 6,
   },
   keyboardButtonText: {
-    fontSize: 14,
+    color: "#4A90E2",
   },
   error: {
     color: "#d32f2f",
