@@ -22,6 +22,150 @@ import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
 
+const PERSPECTIVE_API_KEY = process.env.EXPO_PUBLIC_PERSPECTIVE_API_KEY;
+const bannedWords = [
+  "fuck",
+  "shit",
+  "bitch",
+  "asshole",
+  "dick",
+  "pussy",
+  "cunt",
+  "bastard",
+  "slut",
+  "whore",
+];
+const scamKeywords = [
+  "send money",
+  "cashapp",
+  "venmo",
+  "paypal",
+  "gift card",
+  "wire transfer",
+  "bitcoin",
+  "crypto",
+  "urgent payment",
+  "click this link",
+];
+//console.log("Perspective key exists:", !!process.env.EXPO_PUBLIC_PERSPECTIVE_API_KEY);
+
+async function moderateMessage(text) {
+  try {
+    const lowerText = text.toLowerCase();
+
+    // profanity check
+    for (const word of bannedWords) {
+      if (lowerText.includes(word)) {
+        return {
+          allowed: false,
+          reason: "Please avoid profanity or offensive language.",
+        };
+      }
+    }
+
+    //scam keyword detection
+    for (const phrase of scamKeywords) {
+      if (lowerText.includes(phrase)) {
+        return {
+          allowed: false,
+          reason: "Payment requests are not allowed in chat.",
+        };
+      }
+    }
+
+    // link detection
+    const linkRegex = /(https?:\/\/|www\.)/i;
+    if (linkRegex.test(text)) {
+      return {
+        allowed: false,
+        reason: "Links are not allowed in chat for safety reasons.",
+      };
+    }
+
+    // Perspective API moderation
+    const response = await fetch(
+      `https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze?key=${PERSPECTIVE_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          comment: { text },
+          languages: ["en"],
+          requestedAttributes: {
+            TOXICITY: {},
+            SEVERE_TOXICITY: {},
+            INSULT: {},
+            THREAT: {},
+            PROFANITY: {},
+            IDENTITY_ATTACK: {},
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.log("Perspective API error:", response.status);
+      return { allowed: true, reason: "" };
+    }
+
+    const data = await response.json();
+
+    const scores = data.attributeScores;
+
+    const toxicity = scores?.TOXICITY?.summaryScore?.value ?? 0;
+    const severeToxicity = scores?.SEVERE_TOXICITY?.summaryScore?.value ?? 0;
+    const insult = scores?.INSULT?.summaryScore?.value ?? 0;
+    const threat = scores?.THREAT?.summaryScore?.value ?? 0;
+    const profanity = scores?.PROFANITY?.summaryScore?.value ?? 0;
+    const sexual = scores?.SEXUAL_CONTENT?.summaryScore?.value ?? 0;
+    const identityAttack = scores?.IDENTITY_ATTACK?.summaryScore?.value ?? 0;
+    
+
+    console.log("Perspective scores:", {
+      toxicity,
+      severeToxicity,
+      insult,
+      threat,
+      profanity,
+      sexual,
+      identityAttack,
+    });
+
+    // moderation thresholds
+    if (
+      toxicity > 0.80 ||
+      severeToxicity > 0.70 ||
+      insult > 0.80 ||
+      threat > 0.5 ||
+      sexual > 0.7 ||
+      identityAttack > 0.6
+    ) {
+      return {
+        allowed: false,
+        reason: "Your message appears harmful or abusive.",
+      };
+    }
+
+    if (profanity > 0.8) {
+      return {
+        allowed: false,
+        reason: "Please avoid profanity in messages.",
+      };
+    }
+
+    return { allowed: true, reason: "" };
+
+  } catch (error) {
+    console.warn("Perspective moderation error:", error);
+
+    // allow message if API fails
+    return { allowed: true, reason: "" };
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const REPORT_REASONS = [
   { value: "inappropriate_language", label: "Inappropriate Language" },
   { value: "harassment", label: "Harassment or Bullying" },
@@ -38,10 +182,11 @@ const ChatScreen = () => {
   const { subscribeToMessages, sendMessage, markMessagesAsRead, closeChat } = useChat();
   const { submitReport, hasReported } = useReport();
   const { completeMatch } = useMatch();
-  
+
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
+  const [moderating, setModerating] = useState(false); // true while AI check is in flight
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState("");
   const [reportDescription, setReportDescription] = useState("");
@@ -61,11 +206,9 @@ const ChatScreen = () => {
         if (chatDoc.exists()) {
           const data = chatDoc.data();
           setChatData(data);
-          
-          // Find partner ID from participants array
-          const partner = data.participants?.find(id => id !== user.uid);
+
+          const partner = data.participants?.find((id) => id !== user.uid);
           if (partner) {
-            console.log("Partner user ID:", partner);
             setPartnerUserId(partner);
           } else {
             console.error("Could not find partner in participants");
@@ -87,17 +230,12 @@ const ChatScreen = () => {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          
+
           if (data.status === "closed" && !iClosedChat) {
             Alert.alert(
               "Chat Closed",
               "This chat has been closed because you have been reported for violating community guidelines.",
-              [
-                {
-                  text: "OK",
-                  onPress: () => router.back(),
-                },
-              ]
+              [{ text: "OK", onPress: () => router.back() }]
             );
           }
         }
@@ -115,7 +253,6 @@ const ChatScreen = () => {
 
     const unsubscribe = subscribeToMessages(chatId, (newMessages) => {
       setMessages(newMessages);
-      
       if (newMessages.length > 0) {
         markMessagesAsRead(chatId).catch(() => {});
       }
@@ -132,21 +269,37 @@ const ChatScreen = () => {
     }
   }, [messages]);
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // handleSend — runs AI moderation before every outbound message
+  // ───────────────────────────────────────────────────────────────────────────
   const handleSend = async () => {
-    if (!inputText.trim() || sending) return;
+    if (!inputText.trim() || sending || moderating) return;
 
     const messageText = inputText.trim();
-    
-    setSending(true);
     setInputText("");
-    
+    setModerating(true);
+
     try {
+      const { allowed, reason } = await moderateMessage(messageText);
+
+      if (!allowed) {
+        // Restore the draft so the user can edit rather than retype
+        setInputText(messageText);
+        Alert.alert(
+          "Message Blocked",
+          reason || "Your message wasn't sent because it may violate our community guidelines. Please review and try again."
+        );
+        return;
+      }
+
+      setSending(true);
       await sendMessage(chatId, messageText);
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message");
       setInputText(messageText);
     } finally {
+      setModerating(false);
       setSending(false);
     }
   };
@@ -183,25 +336,15 @@ const ChatScreen = () => {
     setSubmittingReport(true);
 
     try {
-      await submitReport(
-        partnerUserId,
-        selectedReason,
-        reportDescription,
-        {
-          chatId,
-          matchId,
-        }
-      );
+      await submitReport(partnerUserId, selectedReason, reportDescription, {
+        chatId,
+        matchId,
+      });
 
       setIClosedChat(true);
 
-      if (chatId) {
-        await closeChat(chatId);
-      }
-
-      if (matchId) {
-        await completeMatch(matchId);
-      }
+      if (chatId) await closeChat(chatId);
+      if (matchId) await completeMatch(matchId);
 
       setReportModalVisible(false);
       setSelectedReason("");
@@ -210,12 +353,7 @@ const ChatScreen = () => {
       Alert.alert(
         "Report Submitted",
         "Thank you for reporting this issue. The chat has been closed and the match has been completed. Our moderators will review your report.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.back(),
-          },
-        ]
+        [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (error) {
       console.error("Error submitting report:", error);
@@ -227,7 +365,7 @@ const ChatScreen = () => {
 
   const renderMessage = ({ item }) => {
     const isMyMessage = item.senderId === user?.uid;
-    
+
     let timeString = "";
     try {
       if (item.timestamp?.toDate) {
@@ -244,7 +382,7 @@ const ChatScreen = () => {
     } catch (err) {
       console.log("Error formatting timestamp:", err);
     }
-    
+
     return (
       <View
         style={[
@@ -274,10 +412,14 @@ const ChatScreen = () => {
     );
   };
 
+  // Send button is busy while either moderating or sending
+  const isBusy = moderating || sending;
+  const sendLabel = moderating ? "Checking..." : sending ? "..." : "Send";
+
   return (
     <ThemedView style={styles.container}>
       <Spacer height={60} />
-      
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <ThemedText style={styles.backButton}>← Back</ThemedText>
@@ -306,7 +448,9 @@ const ChatScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <ThemedText style={styles.emptyText}>No messages yet</ThemedText>
-              <ThemedText style={styles.emptySubtext}>Start the conversation!</ThemedText>
+              <ThemedText style={styles.emptySubtext}>
+                Start the conversation!
+              </ThemedText>
             </View>
           }
         />
@@ -322,15 +466,17 @@ const ChatScreen = () => {
             maxLength={1000}
             returnKeyType="default"
             blurOnSubmit={false}
+            editable={!isBusy}
           />
           <TouchableOpacity
-            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              (!inputText.trim() || isBusy) && styles.sendButtonDisabled,
+            ]}
             onPress={handleSend}
-            disabled={!inputText.trim() || sending}
+            disabled={!inputText.trim() || isBusy}
           >
-            <ThemedText style={styles.sendButtonText}>
-              {sending ? "..." : "Send"}
-            </ThemedText>
+            <ThemedText style={styles.sendButtonText}>{sendLabel}</ThemedText>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -345,10 +491,7 @@ const ChatScreen = () => {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
         >
-          <TouchableOpacity 
-            style={styles.modalOverlay}
-            activeOpacity={1}
-          >
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1}>
             <View style={styles.modalContent}>
               <ThemedText style={styles.modalTitle}>Report User</ThemedText>
               <ThemedText style={styles.modalSubtitle}>
@@ -361,7 +504,8 @@ const ChatScreen = () => {
                     key={reason.value}
                     style={[
                       styles.reasonOption,
-                      selectedReason === reason.value && styles.reasonOptionSelected,
+                      selectedReason === reason.value &&
+                        styles.reasonOptionSelected,
                     ]}
                     onPress={() => setSelectedReason(reason.value)}
                   >
@@ -370,7 +514,9 @@ const ChatScreen = () => {
                         <View style={styles.radioButtonInner} />
                       )}
                     </View>
-                    <ThemedText style={styles.reasonText}>{reason.label}</ThemedText>
+                    <ThemedText style={styles.reasonText}>
+                      {reason.label}
+                    </ThemedText>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -397,7 +543,9 @@ const ChatScreen = () => {
                   }}
                   disabled={submittingReport}
                 >
-                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                  <ThemedText style={styles.cancelButtonText}>
+                    Cancel
+                  </ThemedText>
                 </TouchableOpacity>
 
                 <TouchableOpacity
