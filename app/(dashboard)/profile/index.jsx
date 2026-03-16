@@ -1,5 +1,6 @@
 import { StyleSheet, View, Image, Dimensions, Text, TouchableOpacity, ActivityIndicator, Alert, Switch, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import React, { useEffect, useState } from 'react';
 import { 
   updateNotificationPreference, 
@@ -100,6 +101,13 @@ const Profile = () => {
           {user.label === 'teacher' ? 'Teacher' : 'Parent'}
         </ThemedText>
 
+        <View style={[styles.row, { gap: 8 }]}>
+        <FontAwesome5 name="school" size={18} color="#4A90E2" />
+        <ThemedText title style={styles.subheading}>
+          {user.school?.schoolName ?? userData?.school ?? null}
+        </ThemedText>
+        </View>
+
         <Spacer height={5} />
       </View>
 
@@ -118,11 +126,6 @@ const Profile = () => {
           <Text style={[styles.buttonText, { color: '#415ba8ff' }]}>Donations</Text>
         </ThemedButton>
       </View>
-
-      <ThemedButton style={styles.button} onPress={() => router.push('/(dashboard)/profile/wishlist')}>
-        <Text style={styles.buttonText}>Wishlist</Text>
-      </ThemedButton>
-      <Spacer height={10} />
 
       <Spacer height={25} />
 
