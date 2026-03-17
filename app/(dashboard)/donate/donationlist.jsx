@@ -53,6 +53,7 @@ const DonationList = () => {
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [contactEmail, setContactEmail] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [showAllPending, setShowAllPending] = useState({});
 
   const loadDonations = async () => {
     try {
@@ -442,7 +443,7 @@ const DonationList = () => {
                   <ThemedText style={styles.sectionTitle}>
                     Pending Requests ({pendingRequests.length}):
                   </ThemedText>
-                  {pendingRequests.map((match) => (
+                  {pendingRequests.slice(0, showAllPending[donation.id] ? undefined : 3).map((match) => (
                     <View key={match.id} style={styles.matchCard}>
                       <ThemedText style={styles.pendingTitle}>New Match Request</ThemedText>
                       <ThemedText style={styles.infoText}>
@@ -473,6 +474,26 @@ const DonationList = () => {
                       </View>
                     </View>
                   ))}
+                  {pendingRequests.length > 3 && (
+                    <TouchableOpacity
+                      style={styles.showMoreButton}
+                      onPress={() => setShowAllPending(prev => ({
+                        ...prev,
+                        [donation.id]: !prev[donation.id]
+                      }))}
+                    >
+                      <ThemedText style={styles.showMoreText}>
+                        {showAllPending[donation.id] 
+                          ? "Show Less" 
+                          : `Show ${pendingRequests.length - 3} More Requests`}
+                      </ThemedText>
+                      <Ionicons 
+                        name={showAllPending[donation.id] ? "chevron-up" : "chevron-down"} 
+                        size={16} 
+                        color="#4A90E2" 
+                      />
+                    </TouchableOpacity>
+                  )}
                 </>
               )}
 
@@ -833,6 +854,22 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "white",
     fontWeight: "bold",
+  },
+  showMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E3F2FD",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 10,
+    gap: 6,
+  },
+  showMoreText: {
+    color: "#4A90E2",
+    fontSize: 14,
+    fontWeight: "600",
   },
   modalOverlay: {
     flex: 1,

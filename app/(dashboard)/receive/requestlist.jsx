@@ -55,6 +55,7 @@ const RequestList = () => {
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [contactEmail, setContactEmail] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [showAllMatches, setShowAllMatches] = useState({});
 
   const loadRequests = async () => {
     try {
@@ -553,7 +554,7 @@ const RequestList = () => {
                     {availableMatches.length} potential {availableMatches.length === 1 ? "match" : "matches"} found! Select
                     ONE to send a request to the donor.
                   </ThemedText>
-                  {availableMatches.map((m, index) => (
+                  {availableMatches.slice(0, showAllMatches[request.id] ? undefined : 3).map((m, index) => (
                     <View key={m.id} style={styles.matchCard}>
                       <ThemedText style={styles.matchTitle}>Match #{index + 1}</ThemedText>
                       <ThemedText>
@@ -576,6 +577,26 @@ const RequestList = () => {
                       </TouchableOpacity>
                     </View>
                   ))}
+                  {availableMatches.length > 3 && (
+                    <TouchableOpacity
+                      style={styles.showMoreButton}
+                      onPress={() => setShowAllMatches(prev => ({
+                        ...prev,
+                        [request.id]: !prev[request.id]
+                      }))}
+                    >
+                      <ThemedText style={styles.showMoreText}>
+                        {showAllMatches[request.id] 
+                          ? "Show Less" 
+                          : `Show ${availableMatches.length - 3} More Matches`}
+                      </ThemedText>
+                      <Ionicons 
+                        name={showAllMatches[request.id] ? "chevron-up" : "chevron-down"} 
+                        size={16} 
+                        color="#4A90E2" 
+                      />
+                    </TouchableOpacity>
+                  )}
                 </>
               )}
 
@@ -814,6 +835,22 @@ const styles = StyleSheet.create({
     borderColor: "#007AFF",
     backgroundColor: "#E0F0FF",
     alignItems: "center",
+  },
+  showMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E3F2FD",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 10,
+    gap: 6,
+  },
+  showMoreText: {
+    color: "#4A90E2",
+    fontSize: 14,
+    fontWeight: "600",
   },
   modalOverlay: {
     flex: 1,
