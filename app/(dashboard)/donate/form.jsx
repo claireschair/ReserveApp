@@ -166,7 +166,7 @@ const DonationForm = () => {
         [
           {
             text: "OK",
-            onPress: () => router.replace("/donate/donationlist"),
+            onPress: () => router.replace("/donate/specifications"),
           },
         ],
         { cancelable: false }

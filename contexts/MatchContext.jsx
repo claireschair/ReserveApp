@@ -61,6 +61,19 @@ async function getZipCodeFromCoordinates(latitude, longitude) {
   }
 }
 
+async function getUserData(userId) {
+  try {
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (userDoc.exists()) {
+      return userDoc.data();
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    return null;
+  }
+}
+
 function normalizeItems(items = []) {
   return items.map((i) => String(i).trim().toLowerCase()).filter(Boolean);
 }
@@ -387,7 +400,14 @@ export function MatchProvider({ children }) {
             doc(db, "requests", request.match.partnerId)
           );
           if (partnerDoc.exists()) {
-            const partner = { id: partnerDoc.id, ...partnerDoc.data() };
+            const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
+            const partnerUserData = await getUserData(partnerRequest.userId);
+
+            const partner = {
+              ...partnerRequest,
+              school: partnerUserData?.school || null,
+              name: partnerUserData?.name || "Unknown",
+            };
 
             const donationDoc = type === "donate" ? request : partner;
             const receiveDoc = type === "receive" ? request : partner;
@@ -423,9 +443,16 @@ export function MatchProvider({ children }) {
             const matchResult = calculateMatchScore(donationDoc, receiveDoc);
 
             if (matchResult && matchResult.score >= MIN_MATCH_SCORE) {
+              const partnerUserData = await getUserData(oppRequest.userId);
+              const enrichedOppRequest = {
+                ...oppRequest,
+                school: partnerUserData?.school || null,
+                name: partnerUserData?.name || "Unknown",
+              };
+
               matches.push({
-                id: oppRequest.id,
-                partner: oppRequest,
+                id: enrichedOppRequest.id,
+                partner: enrichedOppRequest,
                 items: matchResult.overlap,
                 score: matchResult.score,
                 completeness: matchResult.completeness,

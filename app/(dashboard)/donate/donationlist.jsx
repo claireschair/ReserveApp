@@ -18,6 +18,11 @@ function getLocationDisplay(locationData) {
   return "Not provided";
 }
 
+function getSchoolDisplay(userData) {
+  if (!userData?.school) return "No school";
+  return userData.school.schoolName || "Unknown school";
+}
+
 const SORT_LABELS = {
   score: "Best Match",
   items: "Most Items",
@@ -120,7 +125,12 @@ const DonationList = () => {
       const search = searchText.toLowerCase();
       matches = matches.filter((m) => {
         const requestItems = m.partner?.items || [];
-        return requestItems.some(item => item.toLowerCase().includes(search));
+        const partnerSchool = m.partner?.school?.schoolName?.toLowerCase() || "";
+        
+        return (
+          requestItems.some(item => item.toLowerCase().includes(search)) ||
+          partnerSchool.includes(search)
+        );
       });
     }
 
@@ -300,7 +310,7 @@ const DonationList = () => {
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search items..."
+          placeholder="Search items or schools..."
           value={searchText}
           onChangeText={setSearchText}
           placeholderTextColor="#999"
@@ -443,6 +453,9 @@ const DonationList = () => {
                         Requested Items: {match.partner?.items?.join(", ") || "N/A"}
                       </ThemedText>
                       <ThemedText style={styles.subtle}>Match Score: {match.score || 0}</ThemedText>
+                      <ThemedText style={styles.subtle}>
+                        School: {getSchoolDisplay(match.partner)}
+                      </ThemedText>
 
                       <View style={styles.buttonRow}>
                         <TouchableOpacity
@@ -481,6 +494,9 @@ const DonationList = () => {
                       <ThemedText style={styles.subtle}>
                         Requested Items: {match.partner?.items?.join(", ") || "N/A"}
                       </ThemedText>
+                      <ThemedText style={styles.subtle}>
+                        School: {getSchoolDisplay(match.partner)}
+                      </ThemedText>
                     </View>
                   ))}
                 </>
@@ -516,6 +532,10 @@ const DonationList = () => {
                         <ThemedText style={styles.matchDetailLabel}>Matched Items:</ThemedText>
                         <ThemedText style={styles.matchDetailText}>
                           {match.items?.join(", ") || "N/A"}
+                        </ThemedText>
+                        <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>School:</ThemedText>
+                        <ThemedText style={styles.matchDetailText}>
+                          {getSchoolDisplay(match.partner)}
                         </ThemedText>
                       </View>
 
@@ -765,7 +785,7 @@ const styles = StyleSheet.create({
   dismissButtonText: { color: "white", fontSize: 20, fontWeight: "bold" },
   contactInfoBox: { backgroundColor: "white", padding: 12, borderRadius: 8, marginBottom: 8 },
   contactDetail: { fontSize: 15, color: "#333", marginTop: 6, fontWeight: "500" },
-  matchDetailsBox: { backgroundColor: "#F5F5F5", padding: 10, borderRadius: 8, marginBottom: 8 },
+  matchDetailsBox: { backgroundColor: "#ffffff", padding: 10, borderRadius: 8, marginBottom: 8 },
   matchDetailLabel: { fontSize: 13, fontWeight: "bold", color: "#666", marginBottom: 4 },
   matchDetailText: { fontSize: 14, color: "#333" },
   chatButton: {
@@ -831,8 +851,8 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },
   hideKeyboardButton: {
     flexDirection: "row",
-    alignSelf: "flex-end",           // aligns right
-    backgroundColor: "rgba(255,255,255,0.8)", // semi-transparent
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(255,255,255,0.8)",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 20,

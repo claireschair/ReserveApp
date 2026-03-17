@@ -166,7 +166,7 @@ const ReceiveForm = () => {
         [
           {
             text: "OK",
-            onPress: () => router.replace("/receive/requestlist"),
+            onPress: () => router.replace("/receive/specifications"),
           },
         ],
         { cancelable: false }
