@@ -1,8 +1,9 @@
 import { StyleSheet, ScrollView, TouchableOpacity, Linking, View } from 'react-native';
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { Ionicons } from '@expo/vector-icons';
+import { getAuth } from 'firebase/auth';
 
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
@@ -12,6 +13,7 @@ const Wishlist = () => {
   const [wishlists, setWishlists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentUserSchool, setCurrentUserSchool] = useState(null);
 
   useEffect(() => {
     loadWishlists();
@@ -22,14 +24,32 @@ const Wishlist = () => {
       setLoading(true);
       setError(null);
 
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      // Fetch current user's school name from their user doc
+      let mySchoolName = null;
+      if (currentUser) {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          mySchoolName = userData?.school?.schoolName ?? userData?.school ?? null;
+        }
+      }
+      setCurrentUserSchool(mySchoolName);
+
       // Get all users
       const usersSnapshot = await getDocs(collection(db, "users"));
-      
+
       const allWishlists = [];
 
-      // For each user, check if they have a wishlist subcollection
+      // For each user, get their school and wishlist subcollection
       await Promise.all(
         usersSnapshot.docs.map(async (userDoc) => {
+          const userData = userDoc.data();
+          const teacherSchool =
+            userData?.school?.schoolName ?? userData?.school ?? null;
+
           const wishlistsSnapshot = await getDocs(
             collection(db, "users", userDoc.id, "wishlists")
           );
@@ -37,26 +57,33 @@ const Wishlist = () => {
             allWishlists.push({
               id: wishlistDoc.id,
               ...wishlistDoc.data(),
+              schoolName: teacherSchool,
             });
           });
         })
       );
 
-      // Shuffle randomly
+      // Shuffle all first, then put same-school teachers at the top
       const shuffled = allWishlists.sort(() => Math.random() - 0.5);
-      setWishlists(shuffled);
+      const sameSchool = shuffled.filter(
+        (w) => mySchoolName && w.schoolName === mySchoolName
+      );
+      const otherSchools = shuffled.filter(
+        (w) => !mySchoolName || w.schoolName !== mySchoolName
+      );
+
+      setWishlists([...sameSchool, ...otherSchools]);
     } catch (err) {
       console.error("Error loading wishlists:", err);
       setError("Failed to load wishlists. Please try again.");
     } finally {
       setLoading(false);
     }
-};
-
+  };
 
   const openAmazonLink = (url) => {
     if (url) {
-      Linking.openURL(url).catch(err => {
+      Linking.openURL(url).catch((err) => {
         console.error("Failed to open URL:", err);
         alert("Could not open Amazon wishlist link");
       });
@@ -89,53 +116,96 @@ const Wishlist = () => {
     <ThemedView style={styles.pageContainer}>
       <Spacer height={100} />
       <View style={styles.headerCard}>
-        <ThemedText style={styles.heading}>
-          Teachers' Wishlists
-        </ThemedText>
+        <ThemedText style={styles.heading}>Teachers' Wishlists</ThemedText>
         <Spacer height={2} />
         <ThemedText style={styles.subtitle}>
-          Support classrooms by donating needed supplies 
+          Support classrooms by donating needed supplies
         </ThemedText>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         {wishlists.length === 0 ? (
           <View style={styles.emptyContainer}>
             <ThemedText style={styles.emptyText}>
               No wishlists available yet.
             </ThemedText>
             <Spacer height={10} />
-            <ThemedText style={styles.subtleText}>
-              Check back soon!
-            </ThemedText>
+            <ThemedText style={styles.subtleText}>Check back soon!</ThemedText>
           </View>
         ) : (
           wishlists.map((wishlist) => {
-            // Handle items array
-            const itemsArray = Array.isArray(wishlist.items) 
-              ? wishlist.items 
+            const itemsArray = Array.isArray(wishlist.items)
+              ? wishlist.items
               : [];
-            
+            const isMySchool =
+              currentUserSchool && wishlist.schoolName === currentUserSchool;
+
             return (
-              <View key={wishlist.id} style={styles.wishlistCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.profileCircle}>
-                    <Ionicons name="school" size={18} color="#4F7BFF" />
+              <View
+                key={wishlist.id}
+                style={[
+                  styles.wishlistCard,
+                  isMySchool && styles.mySchoolCard,
+                ]}
+              >
+                {/* "Your school" badge */}
+                {isMySchool && (
+                  <View style={styles.mySchoolBadge}>
+                    <Ionicons name="star" size={11} color="#fff" />
+                    <ThemedText style={styles.mySchoolBadgeText}>
+                      Your School
+                    </ThemedText>
                   </View>
-                  <ThemedText style={styles.teacherName}>
-                    {wishlist.name || "Anonymous Teacher"}
-                  </ThemedText>
+                )}
+
+                <View style={styles.cardHeader}>
+                  <View
+                    style={[
+                      styles.profileCircle,
+                      isMySchool && styles.mySchoolCircle,
+                    ]}
+                  >
+                    <Ionicons
+                      name="school"
+                      size={18}
+                      color={isMySchool ? "#fff" : "#4F7BFF"}
+                    />
+                  </View>
+                  <View style={styles.headerTextContainer}>
+                    <ThemedText style={styles.teacherName}>
+                      {wishlist.name || "Anonymous Teacher"}
+                    </ThemedText>
+                    {wishlist.schoolName ? (
+                      <View style={styles.schoolRow}>
+                        <Ionicons
+                          name="location-outline"
+                          size={12}
+                          color="#888"
+                        />
+                        <ThemedText style={styles.schoolNameText}>
+                          {wishlist.schoolName}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
 
                 <Spacer height={10} />
 
                 {itemsArray.length > 0 && (
                   <>
-                    <ThemedText style={styles.sectionLabel}>Items Requested:</ThemedText>
+                    <ThemedText style={styles.sectionLabel}>
+                      Items Requested:
+                    </ThemedText>
                     <View style={styles.itemsContainer}>
                       {itemsArray.map((item, idx) => (
                         <View key={idx} style={styles.itemChip}>
-                          <ThemedText style={styles.itemText}>• {item}</ThemedText>
+                          <ThemedText style={styles.itemText}>
+                            • {item}
+                          </ThemedText>
                         </View>
                       ))}
                     </View>
@@ -144,7 +214,10 @@ const Wishlist = () => {
                 )}
 
                 <TouchableOpacity
-                  style={styles.amazonButton}
+                  style={[
+                    styles.amazonButton,
+                    isMySchool && styles.mySchoolButton,
+                  ]}
                   onPress={() => openAmazonLink(wishlist.amazonLink)}
                 >
                   <ThemedText style={styles.amazonButtonText}>
@@ -167,7 +240,7 @@ const styles = StyleSheet.create({
   pageContainer: {
     flex: 1,
     padding: 15,
-    backgroundColor: "#e6edf4"
+    backgroundColor: "#e6edf4",
   },
   container: {
     flex: 1,
@@ -220,6 +293,29 @@ const styles = StyleSheet.create({
     elevation: 4,
     borderColor: "#e0e0e0",
   },
+  // Highlighted style for same-school cards
+  mySchoolCard: {
+    borderColor: "#4F7BFF",
+    borderWidth: 1.5,
+    shadowColor: "#4F7BFF",
+    shadowOpacity: 0.12,
+  },
+  mySchoolBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    backgroundColor: "#4F7BFF",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  mySchoolBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
   cardHeader: {
     borderBottomWidth: 2,
     borderBottomColor: "#007AFF",
@@ -228,10 +324,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  headerTextContainer: {
+    flex: 1,
+    gap: 3,
+  },
   teacherName: {
     fontSize: 18,
     fontWeight: "700",
     color: "#050c1f",
+  },
+  schoolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  schoolNameText: {
+    fontSize: 13,
+    color: "#888",
+    fontWeight: "500",
   },
   sectionLabel: {
     fontSize: 14,
@@ -264,6 +374,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
+  },
+  mySchoolButton: {
+    backgroundColor: "#4F7BFF",
   },
   amazonButtonText: {
     color: "white",
@@ -308,5 +421,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#aac2f2",
+  },
+  mySchoolCircle: {
+    backgroundColor: "#4F7BFF",
+    borderColor: "#4F7BFF",
   },
 });
