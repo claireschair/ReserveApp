@@ -330,7 +330,7 @@ const RequestList = () => {
 
   return (
     <ThemedView style={styles.container}>
-      <Spacer height={100} />
+      <Spacer height={90} />
       <View style={styles.headerCard}>
         <ThemedText title style={styles.heading}>
           Request Matches
@@ -617,7 +617,7 @@ export default RequestList;
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 15, backgroundColor: "#dee6ff"},
   heading: { 
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 5,
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   },
   headerCard: {
     backgroundColor: "#699cea",
-    paddingVertical: 22,
+    paddingVertical: 18,
     paddingHorizontal: 24,
     borderRadius: 30,
     alignSelf: "center",
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     textAlign: "center",
     color: "#e2f0ff",
     lineHeight: 22,
