@@ -6,9 +6,12 @@ import {
   Keyboard,
   Animated,
   Platform,
+  Modal,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import MapView, { Marker } from "react-native-maps";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useRouter } from "expo-router";
 
 import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
@@ -20,6 +23,7 @@ import PlaceSearchInput from "./PlaceSearchInput";
 
 const SelectDonationLocation = () => {
   const { saveDonationCenter } = useMap();
+  const router = useRouter();
 
   const [items, setItems] = useState([]);
   const [itemInput, setItemInput] = useState("");
@@ -29,6 +33,10 @@ const SelectDonationLocation = () => {
   const [loading, setLoading] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
   const animatedBottom = useRef(new Animated.Value(20)).current;
 
@@ -43,10 +51,22 @@ const SelectDonationLocation = () => {
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (!location || !placeName) {
       setError("Please type the address of the donation center.");
+      return;
+    }
+    if (endDate < startDate) {
+      setError("End date must be after start date.");
       return;
     }
     try {
@@ -56,12 +76,19 @@ const SelectDonationLocation = () => {
         lat: location.latitude,
         lng: location.longitude,
         verified: false,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
       });
       setItems([]);
       setItemInput("");
       setLocation(null);
       setPlaceName(null);
+      setStartDate(new Date());
+      setEndDate(new Date());
       alert("Donation center added!");
+      
+      // Redirect to map page
+      router.push("/(dashboard)/map");
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -96,6 +123,30 @@ const SelectDonationLocation = () => {
       hideSub.remove();
     };
   }, []);
+
+  const onStartDateChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowStartPicker(false);
+    }
+    if (selectedDate) {
+      setStartDate(selectedDate);
+      if (Platform.OS === 'ios') {
+        setShowStartPicker(false);
+      }
+    }
+  };
+
+  const onEndDateChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowEndPicker(false);
+    }
+    if (selectedDate) {
+      setEndDate(selectedDate);
+      if (Platform.OS === 'ios') {
+        setShowEndPicker(false);
+      }
+    }
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -139,12 +190,119 @@ const SelectDonationLocation = () => {
       </MapView>
 
       <Animated.View style={[styles.form, { bottom: animatedBottom }]}>
-        <ThemedText style={styles.label}>Items Accepted (Optional):</ThemedText>
-        <Spacer height={4} />
         {placeName && (
           <ThemedText style={styles.locationText}>📍 {placeName}</ThemedText>
         )}
-        <Spacer height={3} />
+
+        {/* Date Pickers */}
+        <View style={styles.dateContainer}>
+          <View style={styles.dateSection}>
+            <ThemedText style={styles.label}>Start Date:</ThemedText>
+            <TouchableOpacity 
+              style={styles.dateButton}
+              onPress={() => setShowStartPicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={18} color="#4A90E2" />
+              <ThemedText style={styles.dateButtonText}>
+                {formatDate(startDate)}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.dateSection}>
+            <ThemedText style={styles.label}>End Date:</ThemedText>
+            <TouchableOpacity 
+              style={styles.dateButton}
+              onPress={() => setShowEndPicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={18} color="#4A90E2" />
+              <ThemedText style={styles.dateButtonText}>
+                {formatDate(endDate)}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* iOS Modal Date Pickers */}
+        {Platform.OS === 'ios' && showStartPicker && (
+          <Modal
+            transparent={true}
+            animationType="slide"
+            visible={showStartPicker}
+            onRequestClose={() => setShowStartPicker(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <TouchableOpacity onPress={() => setShowStartPicker(false)}>
+                    <ThemedText style={styles.modalButton}>Done</ThemedText>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={onStartDateChange}
+                  minimumDate={new Date()}
+                  textColor="#000"
+                />
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {Platform.OS === 'ios' && showEndPicker && (
+          <Modal
+            transparent={true}
+            animationType="slide"
+            visible={showEndPicker}
+            onRequestClose={() => setShowEndPicker(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <TouchableOpacity onPress={() => setShowEndPicker(false)}>
+                    <ThemedText style={styles.modalButton}>Done</ThemedText>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={endDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={onEndDateChange}
+                  minimumDate={startDate}
+                  textColor="#000"
+                />
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {/* Android Date Pickers */}
+        {Platform.OS === 'android' && showStartPicker && (
+          <DateTimePicker
+            value={startDate}
+            mode="date"
+            display="default"
+            onChange={onStartDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+
+        {Platform.OS === 'android' && showEndPicker && (
+          <DateTimePicker
+            value={endDate}
+            mode="date"
+            display="default"
+            onChange={onEndDateChange}
+            minimumDate={startDate}
+          />
+        )}
+
+        <Spacer height={8} />
+
+        <ThemedText style={styles.label}>Items Accepted (Optional):</ThemedText>
+        <Spacer height={4} />
 
         <View style={styles.itemInputWrapper}>
           <TextInput
@@ -226,12 +384,10 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 16,
     right: 16,
-
     backgroundColor: "#ffffff",
     paddingVertical: 22,
     paddingHorizontal: 20,
     borderRadius: 24,
-
     shadowColor: "#4A90E2",
     shadowOpacity: 0.15,
     shadowRadius: 20,
@@ -242,6 +398,54 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#333",
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  dateSection: {
+    flex: 1,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F3F6FB',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e7ff',
+    marginTop: 6,
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalButton: {
+    color: '#4A90E2',
+    fontSize: 16,
+    fontWeight: '600',
   },
   itemInputWrapper: {
     flexDirection: "row",

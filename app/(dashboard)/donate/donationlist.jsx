@@ -23,6 +23,46 @@ function getSchoolDisplay(userData) {
   return userData.school.schoolName || "Unknown school";
 }
 
+/**
+ * Build a { itemNameLower: specString } map from a request doc's
+ * parallel items[] and specs[] arrays.
+ */
+function buildSpecsMap(requestDoc) {
+  const map = {};
+  if (!requestDoc?.items || !requestDoc?.specs) return map;
+  requestDoc.items.forEach((item, idx) => {
+    const spec = requestDoc.specs[idx];
+    if (spec) map[item.toLowerCase()] = spec;
+  });
+  return map;
+}
+
+/**
+ * Renders each item on its own row as "ItemName - spec" (spec omitted if empty).
+ * Single-word item names shrink font to stay on one line; multi-word names
+ * wrap naturally.
+ */
+function ItemsWithSpecs({ items = [], specsMap = {} }) {
+  if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
+  return (
+    <View style={styles.itemSpecList}>
+      {items.map((item, idx) => {
+        const spec = specsMap[item.toLowerCase()];
+        return (
+          <View key={idx} style={styles.itemSpecRow}>
+            <ThemedText style={styles.itemSpecItemName}>
+              {item}
+              {!!spec && (
+                <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>
+              )}
+            </ThemedText>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const SORT_LABELS = {
   score: "Best Match",
   items: "Most Items",
@@ -40,7 +80,7 @@ const DonationList = () => {
 
   const { getOrCreateChat, getChatByMatchId, closeChat } = useChat();
   const { user } = useContext(UserContext);
-  
+
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,9 +114,7 @@ const DonationList = () => {
   };
 
   useEffect(() => {
-    if (user?.uid) {
-      loadDonations();
-    }
+    if (user?.uid) loadDonations();
   }, [user?.uid]);
 
   useEffect(() => {
@@ -87,30 +125,20 @@ const DonationList = () => {
       where("userId", "==", user.uid),
       where("type", "==", "donate")
     );
-
     const unsubscribeMyDonations = onSnapshot(
       myDonationsQuery,
-      (snapshot) => {
-        loadDonations();
-      },
-      (error) => {
-        console.error("Error listening to my donations:", error);
-      }
+      () => { loadDonations(); },
+      (error) => { console.error("Error listening to my donations:", error); }
     );
 
     const receiveRequestsQuery = query(
       collection(db, "requests"),
       where("type", "==", "receive")
     );
-
     const unsubscribeReceiveRequests = onSnapshot(
       receiveRequestsQuery,
-      (snapshot) => {
-        loadDonations();
-      },
-      (error) => {
-        console.error("Error listening to receive requests:", error);
-      }
+      () => { loadDonations(); },
+      (error) => { console.error("Error listening to receive requests:", error); }
     );
 
     return () => {
@@ -127,7 +155,6 @@ const DonationList = () => {
       matches = matches.filter((m) => {
         const requestItems = m.partner?.items || [];
         const partnerSchool = m.partner?.school?.schoolName?.toLowerCase() || "";
-        
         return (
           requestItems.some(item => item.toLowerCase().includes(search)) ||
           partnerSchool.includes(search)
@@ -182,16 +209,12 @@ const DonationList = () => {
       Alert.alert("Error", "Email address is required.");
       return;
     }
-    
     if (!contactEmail.includes('@')) {
       Alert.alert("Error", "Please provide a valid email address.");
       return;
     }
-
     try {
-      await approveDonation(currentRequestId, {
-        email: contactEmail,
-      });
+      await approveDonation(currentRequestId, { email: contactEmail });
       Alert.alert("Match approved!", "The requestor will provide their contact info next.");
       setContactModalVisible(false);
       setContactEmail("");
@@ -212,13 +235,9 @@ const DonationList = () => {
           partnerEmail: match.partnerContact.email,
         }
       );
-
       router.push({
         pathname: "/chat/[chatId]",
-        params: { 
-          chatId: chat.id, 
-          matchId: donationId,
-        },
+        params: { chatId: chat.id, matchId: donationId },
       });
     } catch (error) {
       Alert.alert("Error", "Failed to open chat");
@@ -241,12 +260,9 @@ const DonationList = () => {
                 const match = donation.matches?.find(m => m.status === "matched");
                 if (match) {
                   const chat = await getChatByMatchId(requestId);
-                  if (chat) {
-                    await closeChat(chat.id);
-                  }
+                  if (chat) await closeChat(chat.id);
                 }
               }
-              
               await completeMatch(requestId);
               Alert.alert("Match Completed!", "Thank you!");
             } catch (err) {
@@ -300,12 +316,8 @@ const DonationList = () => {
     <ThemedView style={styles.container}>
       <Spacer height={100} />
       <View style={styles.headerCard}>
-        <ThemedText title style={styles.heading}>
-          My Donations
-        </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          View your past and current donations!
-        </ThemedText>
+        <ThemedText title style={styles.heading}>My Donations</ThemedText>
+        <ThemedText style={styles.subtitle}>View your past and current donations!</ThemedText>
       </View>
 
       <View style={styles.searchContainer}>
@@ -329,13 +341,10 @@ const DonationList = () => {
       </View>
 
       {searchFocused && (
-      <TouchableOpacity
-        style={styles.hideKeyboardButton}
-        onPress={() => Keyboard.dismiss()}
-      >
-        <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" /> 
-        <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
-      </TouchableOpacity>  
+        <TouchableOpacity style={styles.hideKeyboardButton} onPress={() => Keyboard.dismiss()}>
+          <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
+          <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
+        </TouchableOpacity>
       )}
 
       {showFilters && (
@@ -366,17 +375,13 @@ const DonationList = () => {
         >
           <ThemedText>Sort by: {SORT_LABELS[sortMode]} ▼</ThemedText>
         </TouchableOpacity>
-
         {dropdownOpen && (
           <View style={styles.dropdownMenu}>
             {Object.entries(SORT_LABELS).map(([key, label]) => (
               <TouchableOpacity
                 key={key}
                 style={styles.dropdownItem}
-                onPress={() => {
-                  setSortMode(key);
-                  setDropdownOpen(false);
-                }}
+                onPress={() => { setSortMode(key); setDropdownOpen(false); }}
               >
                 <ThemedText style={sortMode === key && styles.dropdownActiveText}>
                   {label}
@@ -390,9 +395,7 @@ const DonationList = () => {
       <Spacer height={10} />
 
       <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {donations.length === 0 && (
           <ThemedText style={styles.noMatch}>
@@ -402,7 +405,10 @@ const DonationList = () => {
 
         {donations.map((donation) => {
           const filteredMatches = filterAndSortMatches(donation);
-          
+
+          // Specs for this donation (for the header card)
+          const mySpecsMap = buildSpecsMap(donation);
+
           const pendingRequests = filteredMatches.filter(
             (m) => m.status === "pending" && !m.myContact
           );
@@ -413,19 +419,25 @@ const DonationList = () => {
             (m) => m.status === "matched" && m.partnerContact
           );
 
-          const hasAnyMatch = pendingRequests.length > 0 || waitingForRequestor.length > 0 || completedMatches.length > 0;
+          const hasAnyMatch =
+            pendingRequests.length > 0 ||
+            waitingForRequestor.length > 0 ||
+            completedMatches.length > 0;
 
           return (
             <View key={donation.id} style={styles.donationCard}>
               <View style={styles.donationHeader}>
                 <View style={styles.donationHeaderText}>
                   <ThemedText style={styles.donationTitle}>Donation Items:</ThemedText>
-                  <ThemedText>{(donation.items || []).join(", ")}</ThemedText>
+                  {/* Show items with their specs */}
+                  <ItemsWithSpecs
+                    items={donation.items || []}
+                    specsMap={mySpecsMap}
+                  />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(donation.location)}
                   </ThemedText>
                 </View>
-
                 {!hasAnyMatch && (
                   <TouchableOpacity
                     style={styles.deleteIconButton}
@@ -438,65 +450,74 @@ const DonationList = () => {
 
               <Spacer height={10} />
 
+              {/* Pending requests */}
               {pendingRequests.length > 0 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
                     Pending Requests ({pendingRequests.length}):
                   </ThemedText>
-                  {pendingRequests.slice(0, showAllPending[donation.id] ? undefined : 3).map((match) => (
-                    <View key={match.id} style={styles.matchCard}>
-                      <ThemedText style={styles.pendingTitle}>New Match Request</ThemedText>
-                      <ThemedText style={styles.infoText}>
-                        A requestor selected your donation. Approve or deny.
-                      </ThemedText>
-                      <Spacer height={8} />
-                      <ThemedText style={styles.subtle}>
-                        Requested Items: {match.partner?.items?.join(", ") || "N/A"}
-                      </ThemedText>
-                      <ThemedText style={styles.subtle}>Match Score: {match.score || 0}</ThemedText>
-                      <ThemedText style={styles.subtle}>
-                        School: {getSchoolDisplay(match.partner)}
-                      </ThemedText>
-
-                      <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.approveButton]}
-                          onPress={() => handleApprove(donation.id)}
-                        >
-                          <ThemedText style={styles.buttonText}>Approve</ThemedText>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.denyButton]}
-                          onPress={() => handleDeny(donation.id)}
-                        >
-                          <ThemedText style={styles.buttonText}>Deny</ThemedText>
-                        </TouchableOpacity>
+                  {pendingRequests
+                    .slice(0, showAllPending[donation.id] ? undefined : 3)
+                    .map((match) => (
+                      <View key={match.id} style={styles.matchCard}>
+                        <ThemedText style={styles.pendingTitle}>New Match Request</ThemedText>
+                        <ThemedText style={styles.infoText}>
+                          A requestor selected your donation. Approve or deny.
+                        </ThemedText>
+                        <Spacer height={8} />
+                        <ThemedText style={styles.subtle}>Requested Items:</ThemedText>
+                        <ItemsWithSpecs
+                          items={match.partner?.items || []}
+                          specsMap={buildSpecsMap(match.partner)}
+                        />
+                        <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
+                          Match Score: {match.score || 0}
+                        </ThemedText>
+                        <ThemedText style={styles.subtle}>
+                          School: {getSchoolDisplay(match.partner)}
+                        </ThemedText>
+                        <View style={styles.buttonRow}>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.approveButton]}
+                            onPress={() => handleApprove(donation.id)}
+                          >
+                            <ThemedText style={styles.buttonText}>Approve</ThemedText>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.denyButton]}
+                            onPress={() => handleDeny(donation.id)}
+                          >
+                            <ThemedText style={styles.buttonText}>Deny</ThemedText>
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    ))}
                   {pendingRequests.length > 3 && (
                     <TouchableOpacity
                       style={styles.showMoreButton}
-                      onPress={() => setShowAllPending(prev => ({
-                        ...prev,
-                        [donation.id]: !prev[donation.id]
-                      }))}
+                      onPress={() =>
+                        setShowAllPending(prev => ({
+                          ...prev,
+                          [donation.id]: !prev[donation.id],
+                        }))
+                      }
                     >
                       <ThemedText style={styles.showMoreText}>
-                        {showAllPending[donation.id] 
-                          ? "Show Less" 
+                        {showAllPending[donation.id]
+                          ? "Show Less"
                           : `Show ${pendingRequests.length - 3} More Requests`}
                       </ThemedText>
-                      <Ionicons 
-                        name={showAllPending[donation.id] ? "chevron-up" : "chevron-down"} 
-                        size={16} 
-                        color="#4A90E2" 
+                      <Ionicons
+                        name={showAllPending[donation.id] ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color="#4A90E2"
                       />
                     </TouchableOpacity>
                   )}
                 </>
               )}
 
+              {/* Waiting for requestor */}
               {waitingForRequestor.length > 0 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
@@ -512,9 +533,11 @@ const DonationList = () => {
                       <ThemedText style={styles.subtle}>
                         Your email: {match.myContact?.email || "Not provided"}
                       </ThemedText>
-                      <ThemedText style={styles.subtle}>
-                        Requested Items: {match.partner?.items?.join(", ") || "N/A"}
-                      </ThemedText>
+                      <ThemedText style={styles.subtle}>Requested Items:</ThemedText>
+                      <ItemsWithSpecs
+                        items={match.partner?.items || []}
+                        specsMap={buildSpecsMap(match.partner)}
+                      />
                       <ThemedText style={styles.subtle}>
                         School: {getSchoolDisplay(match.partner)}
                       </ThemedText>
@@ -523,6 +546,7 @@ const DonationList = () => {
                 </>
               )}
 
+              {/* Completed matches */}
               {completedMatches.length > 0 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
@@ -551,10 +575,14 @@ const DonationList = () => {
 
                       <View style={styles.matchDetailsBox}>
                         <ThemedText style={styles.matchDetailLabel}>Matched Items:</ThemedText>
-                        <ThemedText style={styles.matchDetailText}>
-                          {match.items?.join(", ") || "N/A"}
+                        {/* Show matched items with the donor's specs */}
+                        <ItemsWithSpecs
+                          items={match.items || []}
+                          specsMap={mySpecsMap}
+                        />
+                        <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>
+                          School:
                         </ThemedText>
-                        <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>School:</ThemedText>
                         <ThemedText style={styles.matchDetailText}>
                           {getSchoolDisplay(match.partner)}
                         </ThemedText>
@@ -590,7 +618,6 @@ const DonationList = () => {
             <ThemedText style={styles.modalHint}>
               Provide your email address to exchange contact information.
             </ThemedText>
-
             <TextInput
               style={[styles.input, { color: "#111" }]}
               placeholder="Your Email *"
@@ -600,7 +627,6 @@ const DonationList = () => {
               autoCapitalize="none"
               placeholderTextColor="#666"
             />
-
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 10 }}>
               <TouchableOpacity
                 style={[styles.actionButton, styles.approveButton, { flex: 1, marginRight: 5 }]}
@@ -629,16 +655,16 @@ const DonationList = () => {
 export default DonationList;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     padding: 16,
     backgroundColor: "#dee6ff",
   },
-  heading: { 
+  heading: {
     fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 5, 
+    marginBottom: 5,
     color: "white",
   },
   headerCard: {
@@ -682,26 +708,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
   },
-  filterButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
+  filterButtonText: { color: "white", fontWeight: "bold" },
   filtersContainer: {
     backgroundColor: "white",
     padding: 14,
     borderRadius: 14,
     marginBottom: 12,
   },
-  filterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  filterLabel: {
-    fontSize: 14,
-    marginRight: 10,
-    width: 80,
-  },
+  filterRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  filterLabel: { fontSize: 14, marginRight: 10, width: 80 },
   filterInput: {
     flex: 1,
     backgroundColor: "white",
@@ -766,21 +781,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginTop: 10,
   },
-  pendingTitle: {
-    fontWeight: "bold",
-    fontSize: 16,
-    color: "#FF9800",
-  },
-  approvedTitle: {
-    fontWeight: "bold",
-    fontSize: 16,
-    color: "#4CAF50",
-  },
-  completeTitle: {
-    fontWeight: "bold",
-    fontSize: 16,
-    color: "#2196F3",
-  },
+  pendingTitle: { fontWeight: "bold", fontSize: 16, color: "#FF9800" },
+  approvedTitle: { fontWeight: "bold", fontSize: 16, color: "#4CAF50" },
+  completeTitle: { fontWeight: "bold", fontSize: 16, color: "#2196F3" },
   contactCard: {
     backgroundColor: "#f0f7ff",
     padding: 16,
@@ -822,11 +825,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  chatButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  chatButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   instructionText: { fontSize: 13, color: "#555", fontStyle: "italic", marginTop: 8 },
   infoText: { fontSize: 13, color: "#555", marginTop: 4, fontStyle: "italic" },
   subtle: { fontSize: 12, color: "#666", marginTop: 2 },
@@ -843,18 +842,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
   },
-  approveButton: {
-    backgroundColor: "#4CAF50",
-    borderColor: "#4CAF50",
-  },
-  denyButton: {
-    backgroundColor: "#FF6B6B",
-    borderColor: "#FF6B6B",
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
+  approveButton: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
+  denyButton: { backgroundColor: "#FF6B6B", borderColor: "#FF6B6B" },
+  buttonText: { color: "white", fontWeight: "bold" },
   showMoreButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -866,26 +856,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 6,
   },
-  showMoreText: {
-    color: "#4A90E2",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  showMoreText: { color: "#4A90E2", fontSize: 14, fontWeight: "600" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     padding: 20,
   },
-  modalContent: { 
+  modalContent: {
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
-    width: "85%", 
+    width: "85%",
     alignSelf: "center",
   },
   modalHint: { fontSize: 14, color: "#666", marginBottom: 10 },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: "#fff",
+  },
   hideKeyboardButton: {
     flexDirection: "row",
     alignSelf: "flex-end",
@@ -902,9 +895,26 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 20,
   },
-  hideKeyboardText: {
-    color: "#4A90E2",
+  hideKeyboardText: { color: "#4A90E2", fontSize: 13, fontWeight: "500" },
+  // Item + spec list styles
+  itemSpecList: {
+    marginTop: 4,
+    gap: 2,
+  },
+  itemSpecRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  itemSpecItemName: {
     fontSize: 13,
+    color: "#333",
     fontWeight: "500",
+  },
+  itemSpecDetail: {
+    fontSize: 13,
+    color: "#4A90E2",
+    fontStyle: "italic",
+    fontWeight: "400",
   },
 });

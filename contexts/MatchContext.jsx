@@ -40,15 +40,15 @@ async function getZipCodeFromCoordinates(latitude, longitude) {
 
     const data = await response.json();
 
-    const zipCode = 
-      data.address?.postcode || 
-      data.address?.postal_code || 
+    const zipCode =
+      data.address?.postcode ||
+      data.address?.postal_code ||
       data.address?.zip_code;
 
     if (zipCode) {
       const cleanZip = zipCode.replace(/[^\d-]/g, '');
       const match = cleanZip.match(/^(\d{5})(-\d{4})?$/);
-      
+
       if (match) {
         return parseInt(match[1], 10);
       }
@@ -173,10 +173,14 @@ export function MatchProvider({ children }) {
   const { user } = useContext(UserContext);
   const userId = user?.uid ?? null;
 
-  async function saveRequest(type, items, locationData = {}, quantitiesObject = {}) {
+  // itemSpecsObject: { [itemName]: "spec string" }
+  async function saveRequest(type, items, locationData = {}, quantitiesObject = {}, itemSpecsObject = {}) {
     if (!userId) return null;
 
     const quantities = items.map((item) => quantitiesObject[item] || 1);
+    // Store specs as a parallel array matching items order (empty string if no spec)
+    const specs = items.map((item) => itemSpecsObject[item] || "");
+
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + EXPIRATION_DAYS);
 
@@ -202,6 +206,7 @@ export function MatchProvider({ children }) {
       type,
       items,
       quantities,
+      specs, // <-- stored but not used in matching
       location: finalLocation,
       status: "active",
       createdAt: Timestamp.now(),
@@ -269,14 +274,14 @@ export function MatchProvider({ children }) {
     return { id: newRequest.id };
   }
 
-  async function saveDonation(items, other, locationData, quantitiesObject) {
+  async function saveDonation(items, other, locationData, quantitiesObject, itemSpecsObject = {}) {
     const allItems = [...items, ...(other || [])];
-    return saveRequest("donate", allItems, locationData, quantitiesObject);
+    return saveRequest("donate", allItems, locationData, quantitiesObject, itemSpecsObject);
   }
 
-  async function saveReceiveRequest(items, other, locationData, quantitiesObject) {
+  async function saveReceiveRequest(items, other, locationData, quantitiesObject, itemSpecsObject = {}) {
     const allItems = [...items, ...(other || [])];
-    return saveRequest("receive", allItems, locationData, quantitiesObject);
+    return saveRequest("receive", allItems, locationData, quantitiesObject, itemSpecsObject);
   }
 
   async function cleanupExpiredAndTimedOut() {
@@ -425,6 +430,10 @@ export function MatchProvider({ children }) {
               status: request.status,
               myContact: request.match.myContact,
               partnerContact: partnerContact,
+              // Pass through specs from the donation side for display
+              donorSpecs: buildSpecsMap(
+                type === "donate" ? request : partner
+              ),
             });
 
             if (request.status === "pending") {
@@ -460,6 +469,9 @@ export function MatchProvider({ children }) {
                 status: null,
                 myContact: null,
                 partnerContact: null,
+                donorSpecs: buildSpecsMap(
+                  type === "donate" ? request : enrichedOppRequest
+                ),
                 _isTemporary: true,
               });
             }
@@ -480,6 +492,17 @@ export function MatchProvider({ children }) {
       console.error("Error in getRequestsWithMatches:", err);
       return [];
     }
+  }
+
+  // Helper: build a { itemName: specString } map from a request doc's items+specs arrays
+  function buildSpecsMap(requestDoc) {
+    const map = {};
+    if (!requestDoc?.items || !requestDoc?.specs) return map;
+    requestDoc.items.forEach((item, idx) => {
+      const spec = requestDoc.specs[idx];
+      if (spec) map[item.toLowerCase()] = spec;
+    });
+    return map;
   }
 
   async function getDonationsWithMatches() {
@@ -506,9 +529,6 @@ export function MatchProvider({ children }) {
         "You already have a pending match. Cancel it first or wait for approval."
       );
     }
-
-    const donationDoc = myRequest.type === "donate" ? myRequest : theirRequest;
-    const receiveDoc = myRequest.type === "receive" ? myRequest : theirRequest;
 
     await updateDoc(doc(db, "requests", myRequest.id), {
       status: "pending",
@@ -610,7 +630,7 @@ export function MatchProvider({ children }) {
 
     const partnerId = request.match?.partnerId;
     if (!partnerId) throw new Error("No partner found for this match.");
-    
+
     await updateDoc(doc(db, "requests", requestId), {
       "match.myContact": {
         email: contactInfo.email,
@@ -710,11 +730,11 @@ export function MatchProvider({ children }) {
     if (!partnerDoc.exists()) throw new Error("Matched request not found.");
 
     const partner = partnerDoc.data();
-    
+
     if (!partner.match?.myContact) {
       throw new Error("The donor hasn't approved yet or hasn't provided contact info.");
     }
-    
+
     await updateDoc(doc(db, "requests", requestId), {
       status: "matched",
       "match.myContact": {
@@ -722,7 +742,7 @@ export function MatchProvider({ children }) {
       },
       "match.partnerContact": partner.match.myContact,
     });
-    
+
     await updateDoc(doc(db, "requests", partnerId), {
       status: "matched",
       "match.partnerContact": {
@@ -795,7 +815,7 @@ export function MatchProvider({ children }) {
 
   function subscribeToRequest(requestId, callback) {
     if (!requestId) return () => {};
-    
+
     const unsubscribe = onSnapshot(
       doc(db, "requests", requestId),
       (docSnap) => {
@@ -816,14 +836,14 @@ export function MatchProvider({ children }) {
       const requestsQuery = query(
         collection(db, "requests"),
         where("status", "==", "completed"),
-        where("type", "==", "donate") 
+        where("type", "==", "donate")
       );
-      
+
       const snapshot = await getDocs(requestsQuery);
       const completedDonations = snapshot.docs.map(doc => doc.data());
-      
+
       let totalItemsDistributed = 0;
-      
+
       completedDonations.forEach(donation => {
         if (donation.items && donation.quantities) {
           donation.items.forEach((item, index) => {
@@ -832,20 +852,20 @@ export function MatchProvider({ children }) {
           });
         }
       });
-      
+
       const activeQuery = query(
         collection(db, "requests"),
         where("status", "in", ["active", "pending", "matched"])
       );
-      
+
       const activeSnapshot = await getDocs(activeQuery);
       const activeRequests = activeSnapshot.docs.map(doc => doc.data());
-      
+
       const donations = activeRequests.filter(r => r.type === "donate");
       const receives = activeRequests.filter(r => r.type === "receive");
-      
+
       const itemCounts = { donated: {}, requested: {} };
-      
+
       donations.forEach(donation => {
         donation.items?.forEach((item, index) => {
           const normalizedItem = item.toLowerCase();
@@ -853,7 +873,7 @@ export function MatchProvider({ children }) {
           itemCounts.donated[normalizedItem] = (itemCounts.donated[normalizedItem] || 0) + quantity;
         });
       });
-      
+
       receives.forEach(receive => {
         receive.items?.forEach((item, index) => {
           const normalizedItem = item.toLowerCase();
@@ -861,19 +881,19 @@ export function MatchProvider({ children }) {
           itemCounts.requested[normalizedItem] = (itemCounts.requested[normalizedItem] || 0) + quantity;
         });
       });
-      
+
       const allItems = new Set([
         ...Object.keys(itemCounts.donated),
         ...Object.keys(itemCounts.requested)
       ]);
-      
+
       const stats = Array.from(allItems).map(item => ({
         item,
         donated: itemCounts.donated[item] || 0,
         requested: itemCounts.requested[item] || 0,
         gap: (itemCounts.requested[item] || 0) - (itemCounts.donated[item] || 0)
       }));
-      
+
       return {
         totalDonations: donations.length,
         totalRequests: receives.length,
