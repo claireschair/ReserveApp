@@ -40,15 +40,15 @@ async function getZipCodeFromCoordinates(latitude, longitude) {
 
     const data = await response.json();
 
-    const zipCode = 
-      data.address?.postcode || 
-      data.address?.postal_code || 
+    const zipCode =
+      data.address?.postcode ||
+      data.address?.postal_code ||
       data.address?.zip_code;
 
     if (zipCode) {
       const cleanZip = zipCode.replace(/[^\d-]/g, '');
       const match = cleanZip.match(/^(\d{5})(-\d{4})?$/);
-      
+
       if (match) {
         return parseInt(match[1], 10);
       }
@@ -57,6 +57,19 @@ async function getZipCodeFromCoordinates(latitude, longitude) {
     return null;
   } catch (error) {
     console.error('Error getting zip code from coordinates:', error);
+    return null;
+  }
+}
+
+async function getUserData(userId) {
+  try {
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (userDoc.exists()) {
+      return userDoc.data();
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching user data:", error);
     return null;
   }
 }
@@ -160,10 +173,14 @@ export function MatchProvider({ children }) {
   const { user } = useContext(UserContext);
   const userId = user?.uid ?? null;
 
-  async function saveRequest(type, items, locationData = {}, quantitiesObject = {}) {
+  // itemSpecsObject: { [itemName]: "spec string" }
+  async function saveRequest(type, items, locationData = {}, quantitiesObject = {}, itemSpecsObject = {}) {
     if (!userId) return null;
 
     const quantities = items.map((item) => quantitiesObject[item] || 1);
+    // Store specs as a parallel array matching items order (empty string if no spec)
+    const specs = items.map((item) => itemSpecsObject[item] || "");
+
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + EXPIRATION_DAYS);
 
@@ -189,6 +206,7 @@ export function MatchProvider({ children }) {
       type,
       items,
       quantities,
+      specs, // <-- stored but not used in matching
       location: finalLocation,
       status: "active",
       createdAt: Timestamp.now(),
@@ -256,14 +274,14 @@ export function MatchProvider({ children }) {
     return { id: newRequest.id };
   }
 
-  async function saveDonation(items, other, locationData, quantitiesObject) {
+  async function saveDonation(items, other, locationData, quantitiesObject, itemSpecsObject = {}) {
     const allItems = [...items, ...(other || [])];
-    return saveRequest("donate", allItems, locationData, quantitiesObject);
+    return saveRequest("donate", allItems, locationData, quantitiesObject, itemSpecsObject);
   }
 
-  async function saveReceiveRequest(items, other, locationData, quantitiesObject) {
+  async function saveReceiveRequest(items, other, locationData, quantitiesObject, itemSpecsObject = {}) {
     const allItems = [...items, ...(other || [])];
-    return saveRequest("receive", allItems, locationData, quantitiesObject);
+    return saveRequest("receive", allItems, locationData, quantitiesObject, itemSpecsObject);
   }
 
   async function cleanupExpiredAndTimedOut() {
@@ -387,7 +405,14 @@ export function MatchProvider({ children }) {
             doc(db, "requests", request.match.partnerId)
           );
           if (partnerDoc.exists()) {
-            const partner = { id: partnerDoc.id, ...partnerDoc.data() };
+            const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
+            const partnerUserData = await getUserData(partnerRequest.userId);
+
+            const partner = {
+              ...partnerRequest,
+              school: partnerUserData?.school || null,
+              name: partnerUserData?.name || "Unknown",
+            };
 
             const donationDoc = type === "donate" ? request : partner;
             const receiveDoc = type === "receive" ? request : partner;
@@ -405,6 +430,10 @@ export function MatchProvider({ children }) {
               status: request.status,
               myContact: request.match.myContact,
               partnerContact: partnerContact,
+              // Pass through specs from the donation side for display
+              donorSpecs: buildSpecsMap(
+                type === "donate" ? request : partner
+              ),
             });
 
             if (request.status === "pending") {
@@ -423,9 +452,16 @@ export function MatchProvider({ children }) {
             const matchResult = calculateMatchScore(donationDoc, receiveDoc);
 
             if (matchResult && matchResult.score >= MIN_MATCH_SCORE) {
+              const partnerUserData = await getUserData(oppRequest.userId);
+              const enrichedOppRequest = {
+                ...oppRequest,
+                school: partnerUserData?.school || null,
+                name: partnerUserData?.name || "Unknown",
+              };
+
               matches.push({
-                id: oppRequest.id,
-                partner: oppRequest,
+                id: enrichedOppRequest.id,
+                partner: enrichedOppRequest,
                 items: matchResult.overlap,
                 score: matchResult.score,
                 completeness: matchResult.completeness,
@@ -433,6 +469,9 @@ export function MatchProvider({ children }) {
                 status: null,
                 myContact: null,
                 partnerContact: null,
+                donorSpecs: buildSpecsMap(
+                  type === "donate" ? request : enrichedOppRequest
+                ),
                 _isTemporary: true,
               });
             }
@@ -455,12 +494,83 @@ export function MatchProvider({ children }) {
     }
   }
 
+  // Helper: build a { itemName: specString } map from a request doc's items+specs arrays
+  function buildSpecsMap(requestDoc) {
+    const map = {};
+    if (!requestDoc?.items || !requestDoc?.specs) return map;
+    requestDoc.items.forEach((item, idx) => {
+      const spec = requestDoc.specs[idx];
+      if (spec) map[item.toLowerCase()] = spec;
+    });
+    return map;
+  }
+
   async function getDonationsWithMatches() {
     return getRequestsWithMatches("donate");
   }
 
   async function getReceiveRequestsWithMatches() {
     return getRequestsWithMatches("receive");
+  }
+
+  async function getCompletedMatches(type) {
+    if (!userId) return [];
+    
+    try {
+      const q = query(
+        collection(db, "requests"),
+        where("userId", "==", userId),
+        where("type", "==", type),
+        where("status", "==", "completed")
+      );
+      
+      const snapshot = await getDocs(q);
+      const completed = [];
+      
+      for (const docSnap of snapshot.docs) {
+        const request = { id: docSnap.id, ...docSnap.data() };
+        
+        if (request.match?.partnerId) {
+          const partnerDoc = await getDoc(doc(db, "requests", request.match.partnerId));
+          if (partnerDoc.exists()) {
+            const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
+            const partnerUserData = await getUserData(partnerRequest.userId);
+            
+            const partner = {
+              ...partnerRequest,
+              school: partnerUserData?.school || null,
+              name: partnerUserData?.name || "Unknown",
+            };
+            
+            const donationDoc = type === "donate" ? request : partner;
+            const receiveDoc = type === "receive" ? request : partner;
+            const matchResult = calculateMatchScore(donationDoc, receiveDoc);
+            
+            completed.push({
+              ...request,
+              match: {
+                ...request.match,
+                partner,
+                items: matchResult?.overlap || [],
+                score: matchResult?.score || 0,
+              }
+            });
+          }
+        }
+      }
+      
+      // Sort by completion date, newest first
+      completed.sort((a, b) => {
+        const aTime = a.completedAt?.seconds || 0;
+        const bTime = b.completedAt?.seconds || 0;
+        return bTime - aTime;
+      });
+      
+      return completed;
+    } catch (err) {
+      console.error("Error fetching completed matches:", err);
+      return [];
+    }
   }
 
   async function createAndSelectMatch(myRequest, theirRequest) {
@@ -479,9 +589,6 @@ export function MatchProvider({ children }) {
         "You already have a pending match. Cancel it first or wait for approval."
       );
     }
-
-    const donationDoc = myRequest.type === "donate" ? myRequest : theirRequest;
-    const receiveDoc = myRequest.type === "receive" ? myRequest : theirRequest;
 
     await updateDoc(doc(db, "requests", myRequest.id), {
       status: "pending",
@@ -583,7 +690,7 @@ export function MatchProvider({ children }) {
 
     const partnerId = request.match?.partnerId;
     if (!partnerId) throw new Error("No partner found for this match.");
-    
+
     await updateDoc(doc(db, "requests", requestId), {
       "match.myContact": {
         email: contactInfo.email,
@@ -683,11 +790,11 @@ export function MatchProvider({ children }) {
     if (!partnerDoc.exists()) throw new Error("Matched request not found.");
 
     const partner = partnerDoc.data();
-    
+
     if (!partner.match?.myContact) {
       throw new Error("The donor hasn't approved yet or hasn't provided contact info.");
     }
-    
+
     await updateDoc(doc(db, "requests", requestId), {
       status: "matched",
       "match.myContact": {
@@ -695,7 +802,7 @@ export function MatchProvider({ children }) {
       },
       "match.partnerContact": partner.match.myContact,
     });
-    
+
     await updateDoc(doc(db, "requests", partnerId), {
       status: "matched",
       "match.partnerContact": {
@@ -720,7 +827,7 @@ export function MatchProvider({ children }) {
     return true;
   }
 
-  async function completeMatch(requestId) {
+  async function completeMatch(requestId, chatId = null) {
     if (!userId) return null;
 
     const requestDoc = await getDoc(doc(db, "requests", requestId));
@@ -729,10 +836,18 @@ export function MatchProvider({ children }) {
     const request = requestDoc.data();
     const partnerId = request.match?.partnerId;
 
-    await updateDoc(doc(db, "requests", requestId), { status: "completed" });
+    await updateDoc(doc(db, "requests", requestId), { 
+      status: "completed",
+      completedAt: Timestamp.now(),
+      "match.chatId": chatId,
+    });
 
     if (partnerId) {
-      await updateDoc(doc(db, "requests", partnerId), { status: "completed" });
+      await updateDoc(doc(db, "requests", partnerId), { 
+        status: "completed",
+        completedAt: Timestamp.now(),
+        "match.chatId": chatId,
+      });
     }
 
     return true;
@@ -768,7 +883,7 @@ export function MatchProvider({ children }) {
 
   function subscribeToRequest(requestId, callback) {
     if (!requestId) return () => {};
-    
+
     const unsubscribe = onSnapshot(
       doc(db, "requests", requestId),
       (docSnap) => {
@@ -789,14 +904,14 @@ export function MatchProvider({ children }) {
       const requestsQuery = query(
         collection(db, "requests"),
         where("status", "==", "completed"),
-        where("type", "==", "donate") 
+        where("type", "==", "donate")
       );
-      
+
       const snapshot = await getDocs(requestsQuery);
       const completedDonations = snapshot.docs.map(doc => doc.data());
-      
+
       let totalItemsDistributed = 0;
-      
+
       completedDonations.forEach(donation => {
         if (donation.items && donation.quantities) {
           donation.items.forEach((item, index) => {
@@ -805,20 +920,20 @@ export function MatchProvider({ children }) {
           });
         }
       });
-      
+
       const activeQuery = query(
         collection(db, "requests"),
         where("status", "in", ["active", "pending", "matched"])
       );
-      
+
       const activeSnapshot = await getDocs(activeQuery);
       const activeRequests = activeSnapshot.docs.map(doc => doc.data());
-      
+
       const donations = activeRequests.filter(r => r.type === "donate");
       const receives = activeRequests.filter(r => r.type === "receive");
-      
+
       const itemCounts = { donated: {}, requested: {} };
-      
+
       donations.forEach(donation => {
         donation.items?.forEach((item, index) => {
           const normalizedItem = item.toLowerCase();
@@ -826,7 +941,7 @@ export function MatchProvider({ children }) {
           itemCounts.donated[normalizedItem] = (itemCounts.donated[normalizedItem] || 0) + quantity;
         });
       });
-      
+
       receives.forEach(receive => {
         receive.items?.forEach((item, index) => {
           const normalizedItem = item.toLowerCase();
@@ -834,19 +949,19 @@ export function MatchProvider({ children }) {
           itemCounts.requested[normalizedItem] = (itemCounts.requested[normalizedItem] || 0) + quantity;
         });
       });
-      
+
       const allItems = new Set([
         ...Object.keys(itemCounts.donated),
         ...Object.keys(itemCounts.requested)
       ]);
-      
+
       const stats = Array.from(allItems).map(item => ({
         item,
         donated: itemCounts.donated[item] || 0,
         requested: itemCounts.requested[item] || 0,
         gap: (itemCounts.requested[item] || 0) - (itemCounts.donated[item] || 0)
       }));
-      
+
       return {
         totalDonations: donations.length,
         totalRequests: receives.length,
@@ -881,6 +996,7 @@ export function MatchProvider({ children }) {
         saveRequest: saveReceiveRequest,
         getRequestsWithMatches: getReceiveRequestsWithMatches,
         getDonationsWithMatches,
+        getCompletedMatches,
         createAndSelectMatch,
         cancelPendingMatch,
         approveDonation: approveMatch,

@@ -38,6 +38,12 @@ const Receive = () => {
       description: 'Keep track of your donations and manage your giving history easily.',
       route: '/(dashboard)/donate/donationlist',
     },
+    {
+      icon: 'time-outline',
+      label: 'Donation History',
+      description: 'Browse previously completed donations and chat history.',
+      route: '/(dashboard)/donate/history',
+    },
   ];
 
   return (

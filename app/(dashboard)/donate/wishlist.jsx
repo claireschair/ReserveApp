@@ -9,11 +9,14 @@ import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 
+const ITEMS_PER_PAGE = 5;
+
 const Wishlist = () => {
   const [wishlists, setWishlists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentUserSchool, setCurrentUserSchool] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadWishlists();
@@ -90,6 +93,28 @@ const Wishlist = () => {
     }
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(wishlists.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentWishlists = wishlists.slice(startIndex, endIndex);
+
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.container}>
@@ -136,97 +161,159 @@ const Wishlist = () => {
             <ThemedText style={styles.subtleText}>Check back soon!</ThemedText>
           </View>
         ) : (
-          wishlists.map((wishlist) => {
-            const itemsArray = Array.isArray(wishlist.items)
-              ? wishlist.items
-              : [];
-            const isMySchool =
-              currentUserSchool && wishlist.schoolName === currentUserSchool;
+          <>
+            {currentWishlists.map((wishlist) => {
+              const itemsArray = Array.isArray(wishlist.items)
+                ? wishlist.items
+                : [];
+              const isMySchool =
+                currentUserSchool && wishlist.schoolName === currentUserSchool;
 
-            return (
-              <View
-                key={wishlist.id}
-                style={[
-                  styles.wishlistCard,
-                  isMySchool && styles.mySchoolCard,
-                ]}
-              >
-                {/* "Your school" badge */}
-                {isMySchool && (
-                  <View style={styles.mySchoolBadge}>
-                    <Ionicons name="star" size={11} color="#fff" />
-                    <ThemedText style={styles.mySchoolBadgeText}>
-                      Your School
-                    </ThemedText>
-                  </View>
-                )}
+              return (
+                <View
+                  key={wishlist.id}
+                  style={[
+                    styles.wishlistCard,
+                    isMySchool && styles.mySchoolCard,
+                  ]}
+                >
+                  {/* "Your school" badge */}
+                  {isMySchool && (
+                    <View style={styles.mySchoolBadge}>
+                      <Ionicons name="star" size={11} color="#fff" />
+                      <ThemedText style={styles.mySchoolBadgeText}>
+                        Your School
+                      </ThemedText>
+                    </View>
+                  )}
 
-                <View style={styles.cardHeader}>
-                  <View
-                    style={[
-                      styles.profileCircle,
-                      isMySchool && styles.mySchoolCircle,
-                    ]}
-                  >
-                    <Ionicons
-                      name="school"
-                      size={18}
-                      color={isMySchool ? "#fff" : "#4F7BFF"}
-                    />
-                  </View>
-                  <View style={styles.headerTextContainer}>
-                    <ThemedText style={styles.teacherName}>
-                      {wishlist.name || "Anonymous Teacher"}
-                    </ThemedText>
-                    {wishlist.schoolName ? (
-                      <View style={styles.schoolRow}>
-                        <Ionicons
-                          name="location-outline"
-                          size={12}
-                          color="#888"
-                        />
-                        <ThemedText style={styles.schoolNameText}>
-                          {wishlist.schoolName}
-                        </ThemedText>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-
-                <Spacer height={10} />
-
-                {itemsArray.length > 0 && (
-                  <>
-                    <ThemedText style={styles.sectionLabel}>
-                      Items Requested:
-                    </ThemedText>
-                    <View style={styles.itemsContainer}>
-                      {itemsArray.map((item, idx) => (
-                        <View key={idx} style={styles.itemChip}>
-                          <ThemedText style={styles.itemText}>
-                            • {item}
+                  <View style={styles.cardHeader}>
+                    <View
+                      style={[
+                        styles.profileCircle,
+                        isMySchool && styles.mySchoolCircle,
+                      ]}
+                    >
+                      <Ionicons
+                        name="school"
+                        size={18}
+                        color={isMySchool ? "#fff" : "#4F7BFF"}
+                      />
+                    </View>
+                    <View style={styles.headerTextContainer}>
+                      <ThemedText style={styles.teacherName}>
+                        {wishlist.name || "Anonymous Teacher"}
+                      </ThemedText>
+                      {wishlist.schoolName ? (
+                        <View style={styles.schoolRow}>
+                          <Ionicons
+                            name="location-outline"
+                            size={12}
+                            color="#888"
+                          />
+                          <ThemedText style={styles.schoolNameText}>
+                            {wishlist.schoolName}
                           </ThemedText>
                         </View>
-                      ))}
+                      ) : null}
                     </View>
-                    <Spacer height={15} />
-                  </>
-                )}
+                  </View>
+
+                  <Spacer height={10} />
+
+                  {itemsArray.length > 0 && (
+                    <>
+                      <ThemedText style={styles.sectionLabel}>
+                        Items Requested:
+                      </ThemedText>
+                      <View style={styles.itemsContainer}>
+                        {itemsArray.map((item, idx) => (
+                          <View key={idx} style={styles.itemChip}>
+                            <ThemedText style={styles.itemText}>
+                              • {item}
+                            </ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                      <Spacer height={15} />
+                    </>
+                  )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.amazonButton,
+                      isMySchool && styles.mySchoolButton,
+                    ]}
+                    onPress={() => openAmazonLink(wishlist.amazonLink)}
+                  >
+                    <ThemedText style={styles.amazonButtonText}>
+                      View Amazon Wishlist →
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <View style={styles.paginationContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.navButton,
+                    currentPage === 1 && styles.navButtonDisabled,
+                  ]}
+                  onPress={goToPreviousPage}
+                  disabled={currentPage === 1}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={20}
+                    color={currentPage === 1 ? "#ccc" : "#4A90E2"}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.pageNumbersContainer}>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (pageNum) => (
+                      <TouchableOpacity
+                        key={pageNum}
+                        style={[
+                          styles.pageButton,
+                          currentPage === pageNum && styles.pageButtonActive,
+                        ]}
+                        onPress={() => goToPage(pageNum)}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.pageButtonText,
+                            currentPage === pageNum &&
+                              styles.pageButtonTextActive,
+                          ]}
+                        >
+                          {pageNum}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )
+                  )}
+                </View>
 
                 <TouchableOpacity
                   style={[
-                    styles.amazonButton,
-                    isMySchool && styles.mySchoolButton,
+                    styles.navButton,
+                    currentPage === totalPages && styles.navButtonDisabled,
                   ]}
-                  onPress={() => openAmazonLink(wishlist.amazonLink)}
+                  onPress={goToNextPage}
+                  disabled={currentPage === totalPages}
                 >
-                  <ThemedText style={styles.amazonButtonText}>
-                    View Amazon Wishlist →
-                  </ThemedText>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={currentPage === totalPages ? "#ccc" : "#4A90E2"}
+                  />
                 </TouchableOpacity>
               </View>
-            );
-          })
+            )}
+          </>
         )}
         <Spacer height={20} />
       </ScrollView>
@@ -293,7 +380,6 @@ const styles = StyleSheet.create({
     elevation: 4,
     borderColor: "#e0e0e0",
   },
-  // Highlighted style for same-school cards
   mySchoolCard: {
     borderColor: "#4F7BFF",
     borderWidth: 1.5,
@@ -382,6 +468,54 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  paginationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  navButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+  },
+  navButtonDisabled: {
+    borderColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+  },
+  pageNumbersContainer: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  pageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  pageButtonActive: {
+    backgroundColor: "#4A90E2",
+    borderColor: "#4A90E2",
+  },
+  pageButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  pageButtonTextActive: {
+    color: "white",
   },
   emptyContainer: {
     alignItems: "center",

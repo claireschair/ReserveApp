@@ -9,6 +9,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Text,
 } from "react-native";
 import React, { useState } from "react";
 import Spacer from "../../../components/Spacer";
@@ -23,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 const DonationForm = () => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [quantities, setQuantities] = useState({});
+  const [itemSpecs, setItemSpecs] = useState({});
   const [otherItems, setOtherItems] = useState([]);
   const [otherInput, setOtherInput] = useState("");
   const [selectionMethod, setSelectionMethod] = useState(null);
@@ -30,7 +32,7 @@ const DonationForm = () => {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
 
-  const [isOtherInputFocused, setIsOtherInputFocused] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [isZipFocused, setIsZipFocused] = useState(false);
 
   const { saveDonation } = useMatch();
@@ -45,14 +47,21 @@ const DonationForm = () => {
     "Crayons",
     "Binders",
     "Folders",
+    "Tissues",
+    "Hand Sanitizer",
   ];
+
+  const allSelectedItems = [...selectedItems, ...otherItems];
 
   const toggleItem = (item) => {
     setSelectedItems((prev) => {
       if (prev.includes(item)) {
         const newQuantities = { ...quantities };
+        const newSpecs = { ...itemSpecs };
         delete newQuantities[item];
+        delete newSpecs[item];
         setQuantities(newQuantities);
+        setItemSpecs(newSpecs);
         return prev.filter((i) => i !== item);
       } else {
         return [...prev, item];
@@ -62,6 +71,10 @@ const DonationForm = () => {
 
   const updateQuantity = (item, value) => {
     setQuantities({ ...quantities, [item]: value });
+  };
+
+  const updateSpec = (item, value) => {
+    setItemSpecs({ ...itemSpecs, [item]: value });
   };
 
   const handleAddOtherItem = () => {
@@ -75,8 +88,11 @@ const DonationForm = () => {
   const handleRemoveOtherItem = (index) => {
     const item = otherItems[index];
     const newQuantities = { ...quantities };
+    const newSpecs = { ...itemSpecs };
     delete newQuantities[item];
+    delete newSpecs[item];
     setQuantities(newQuantities);
+    setItemSpecs(newSpecs);
     setOtherItems(otherItems.filter((_, i) => i !== index));
   };
 
@@ -87,7 +103,6 @@ const DonationForm = () => {
         setError("Location permission denied.");
         return;
       }
-
       const loc = await Location.getCurrentPositionAsync({});
       setLocation({
         latitude: loc.coords.latitude,
@@ -127,15 +142,13 @@ const DonationForm = () => {
       }
     }
 
-    if (selectionMethod === "location") {
-      if (!location) {
-        setError("Please select your current location.");
-        return;
-      }
+    if (selectionMethod === "location" && !location) {
+      setError("Please select your current location.");
+      return;
     }
 
     const finalQuantities = {};
-    [...selectedItems, ...otherItems].forEach((item) => {
+    allSelectedItems.forEach((item) => {
       const qty = parseInt(quantities[item], 10);
       finalQuantities[item] = isNaN(qty) || qty < 1 ? 1 : qty;
     });
@@ -149,11 +162,13 @@ const DonationForm = () => {
           lat: selectionMethod === "location" ? location.latitude : null,
           lng: selectionMethod === "location" ? location.longitude : null,
         },
-        finalQuantities
+        finalQuantities,
+        itemSpecs
       );
 
       setSelectedItems([]);
       setQuantities({});
+      setItemSpecs({});
       setOtherItems([]);
       setOtherInput("");
       setZipCode("");
@@ -163,12 +178,7 @@ const DonationForm = () => {
       Alert.alert(
         "Thank you!",
         "Thank you for your donation!",
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace("/donate/donationlist"),
-          },
-        ],
+        [{ text: "OK", onPress: () => router.replace("/donate/donationlist") }],
         { cancelable: false }
       );
     } catch (err) {
@@ -181,206 +191,240 @@ const DonationForm = () => {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <KeyboardAvoidingView
           style={{ flex: 1, width: "100%" }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}            
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-        <ScrollView contentContainerStyle={{ ...styles.scrollContent, flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-          <Spacer height={90} />
-          <ThemedText title style={styles.heading}>
-            Donation Form
-          </ThemedText>
+          <ScrollView
+            contentContainerStyle={{ ...styles.scrollContent, flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Spacer height={90} />
+            <ThemedText title style={styles.heading}>
+              Donation Form
+            </ThemedText>
 
-          <Spacer height={20} />
+            <Spacer height={20} />
 
-          <ThemedText>Select Supplies to Donate:</ThemedText>
-          <Spacer height={10} />
-
-          <View style={styles.supplyContainer}>
-            <View style={styles.column}>
-              {supplyOptions.slice(0, 4).map((item) => (
-                <View key={item}>
+            {/* ── Supply grid ── */}
+            <ThemedText>Select Supplies to Donate:</ThemedText>
+            <Spacer height={10} />
+            <View style={styles.supplyContainer}>
+              <View style={styles.column}>
+                {supplyOptions.slice(0, 5).map((item) => (
                   <TouchableOpacity
+                    key={item}
                     onPress={() => toggleItem(item)}
-                    style={[styles.itemButton, selectedItems.includes(item) && styles.itemSelected]}
+                    style={[
+                      styles.itemButton,
+                      selectedItems.includes(item) && styles.itemSelected,
+                    ]}
                   >
                     <ThemedText
-                      style={selectedItems.includes(item) ? styles.itemTextSelected : styles.itemText}
+                      style={
+                        selectedItems.includes(item)
+                          ? styles.itemTextSelected
+                          : styles.itemText
+                      }
                     >
                       {item}
                     </ThemedText>
                   </TouchableOpacity>
-                  {selectedItems.includes(item) && (
-                    <View style={styles.quantityContainer}>
-                      <ThemedText style={styles.quantityLabel}>Qty:</ThemedText>
-                      <TextInput
-                        style={styles.quantityInput}
-                        value={quantities[item] || ""}
-                        onChangeText={(val) => updateQuantity(item, val)}
-                        keyboardType="numeric"
-                        placeholder="1"
-                        selectTextOnFocus={true}
-                        placeholderTextColor="#999"
-                        onFocus={() => setIsOtherInputFocused(true)}
-                        onBlur={() => setIsOtherInputFocused(false)}
-                      />
-                    </View>
-                  )}
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.column}>
-              {supplyOptions.slice(4).map((item) => (
-                <View key={item}>
+                ))}
+              </View>
+              <View style={styles.column}>
+                {supplyOptions.slice(5).map((item) => (
                   <TouchableOpacity
+                    key={item}
                     onPress={() => toggleItem(item)}
-                    style={[styles.itemButton, selectedItems.includes(item) && styles.itemSelected]}
+                    style={[
+                      styles.itemButton,
+                      selectedItems.includes(item) && styles.itemSelected,
+                    ]}
                   >
                     <ThemedText
-                      style={selectedItems.includes(item) ? styles.itemTextSelected : styles.itemText}
+                      style={
+                        selectedItems.includes(item)
+                          ? styles.itemTextSelected
+                          : styles.itemText
+                      }
                     >
                       {item}
                     </ThemedText>
                   </TouchableOpacity>
-                  {selectedItems.includes(item) && (
-                    <View style={styles.quantityContainer}>
-                      <ThemedText style={styles.quantityLabel}>Qty:</ThemedText>
-                      <TextInput
-                        style={styles.quantityInput}
-                        value={quantities[item] || ""}
-                        onChangeText={(val) => updateQuantity(item, val)}
-                        keyboardType="numeric"
-                        placeholder="1"
-                        selectTextOnFocus={true}
-                        placeholderTextColor="#999"
-                      />
-                    </View>
-                  )}
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
 
-          <Spacer height={15} />
+            <Spacer height={15} />
 
-          <ThemedText>Add Other Items (Optional):</ThemedText>
-          <Spacer height={10} />
-
-          <View style={styles.otherInputWrapper}>
-            <TextInput
-              style={[styles.otherInput, { color: "#111" }]}
-              placeholder="e.g., Glue sticks"
-              value={otherInput}
-              onChangeText={setOtherInput}
-              onSubmitEditing={handleAddOtherItem}
-              returnKeyType="done"
-              placeholderTextColor="#999"
-              onFocus={() => setIsOtherInputFocused(true)}
-              onBlur={() => setIsOtherInputFocused(false)}
-            />
-            <TouchableOpacity style={styles.addButton} onPress={handleAddOtherItem}>
-              <ThemedText style={styles.addButtonText}>Add</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          {isOtherInputFocused && (
-            <TouchableOpacity
-              style={styles.hideKeyboardFloating}
-              onPress={Keyboard.dismiss}
-            >
-              <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
-              <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
-            </TouchableOpacity>
-          )}
-
-          {otherItems.length > 0 && (
-            <View style={styles.otherItemsList}>
-              {otherItems.map((item, index) => (
-                <View key={index} style={styles.otherItemChip}>
-                  <ThemedText style={styles.otherItemText}>{item}</ThemedText>
-                  <View style={styles.quantityMini}>
-                    <ThemedText style={styles.quantityMiniLabel}>Qty:</ThemedText>
-                    <TextInput
-                      style={styles.quantityMiniInput}
-                      value={quantities[item] || ""}
-                      onChangeText={(val) => updateQuantity(item, val)}
-                      keyboardType="numeric"
-                      selectTextOnFocus={true}
-                      placeholderTextColor="#999"
-                    />
-                  </View>
-                  <TouchableOpacity onPress={() => handleRemoveOtherItem(index)}>
-                    <ThemedText style={styles.removeButton}>X</ThemedText>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <Spacer height={20} />
-          <ThemedText>Choose Matching Method:</ThemedText>
-          <Spacer height={10} />
-
-          <View style={styles.radioContainer}>
-            <TouchableOpacity
-              style={[styles.radioButton, selectionMethod === "zip" && styles.radioSelected]}
-              onPress={() => setSelectionMethod("zip")}
-            >
-              <ThemedText style={styles.radioText}>Zip Code</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.radioButton, selectionMethod === "location" && styles.radioSelected]}
-              onPress={() => setSelectionMethod("location")}
-            >
-              <ThemedText style={styles.radioText}>Current Location</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          <Spacer height={10} />
-
-          {selectionMethod === "zip" && (
-            <View style={{ width: "100%", alignItems: "center" }}>
-              <ThemedTextInput
-                style={styles.input}
-                placeholder="Enter Zip Code"
-                value={zipCode}
-                onChangeText={setZipCode}
-                keyboardType="numeric"
-                onFocus={() => setIsZipFocused(true)}
-                onBlur={() => setIsZipFocused(false)}
+            {/* ── Add other items ── */}
+            <ThemedText>Add Other Items (Optional):</ThemedText>
+            <Spacer height={10} />
+            <View style={styles.otherInputWrapper}>
+              <TextInput
+                style={[styles.otherInput, { color: "#111" }]}
+                placeholder="e.g., Glue sticks"
+                value={otherInput}
+                onChangeText={setOtherInput}
+                onSubmitEditing={handleAddOtherItem}
+                returnKeyType="done"
+                placeholderTextColor="#999"
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
               />
-
-              {(isZipFocused) && (
-                <TouchableOpacity
-                  style={styles.hideKeyboardFloating}
-                  onPress={Keyboard.dismiss}
-                >
-                  <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
-                  <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity style={styles.addButton} onPress={handleAddOtherItem}>
+                <ThemedText style={styles.addButtonText}>Add</ThemedText>
+              </TouchableOpacity>
             </View>
-          )}
-          
 
-          {selectionMethod === "location" && (
-            <TouchableOpacity style={styles.button} onPress={getLocation}>
-              <ThemedText style={styles.buttonText}>
-                {location ? "Location Selected!" : "Use Current Location"}
-              </ThemedText>
+            {isInputFocused && (
+              <TouchableOpacity
+                style={styles.hideKeyboardFloating}
+                onPress={Keyboard.dismiss}
+              >
+                <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
+                <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
+              </TouchableOpacity>
+            )}
+
+            {/* ── Selected items summary with qty + specs ── */}
+            {allSelectedItems.length > 0 && (
+              <>
+                <Spacer height={20} />
+                <ThemedText>Your Selected Items:</ThemedText>
+                <Spacer height={8} />
+                <View style={styles.selectedItemsContainer}>
+                  {allSelectedItems.map((item, index) => {
+                    const isOther = otherItems.includes(item);
+                    return (
+                      <View key={item} style={styles.selectedItemRow}>
+                        {/* Item name + remove button */}
+                        <View style={styles.selectedItemLeft}>
+                          <TouchableOpacity
+                            style={styles.removeChipButton}
+                            onPress={() => {
+                              if (isOther) {
+                                handleRemoveOtherItem(otherItems.indexOf(item));
+                              } else {
+                                toggleItem(item);
+                              }
+                            }}
+                          >
+                            <ThemedText style={styles.removeChipText}>×</ThemedText>
+                          </TouchableOpacity>
+                          <View style={styles.selectedItemNameBox}>
+                            <Text
+                              style={styles.selectedItemName}
+                              adjustsFontSizeToFit={!item.trim().includes(" ")}
+                              numberOfLines={item.trim().includes(" ") ? undefined : 1}
+                              minimumFontScale={0.5}
+                            >
+                              {item}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Qty input */}
+                        <View style={styles.selectedItemQty}>
+                          <ThemedText style={styles.qtyLabel}>Qty</ThemedText>
+                          <TextInput
+                            style={styles.qtyInput}
+                            value={quantities[item] || ""}
+                            onChangeText={(val) => updateQuantity(item, val)}
+                            keyboardType="numeric"
+                            placeholder="1"
+                            placeholderTextColor="#aaa"
+                            selectTextOnFocus
+                            onFocus={() => setIsInputFocused(true)}
+                            onBlur={() => setIsInputFocused(false)}
+                          />
+                        </View>
+
+                        {/* Specs input */}
+                        <TextInput
+                          style={styles.specInput}
+                          value={itemSpecs[item] || ""}
+                          onChangeText={(val) => updateSpec(item, val)}
+                          placeholder="Specifications (opt)"
+                          placeholderTextColor="#aaa"
+                          onFocus={() => setIsInputFocused(true)}
+                          onBlur={() => setIsInputFocused(false)}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            <Spacer height={20} />
+
+            {/* ── Matching method ── */}
+            <ThemedText>Choose Matching Method:</ThemedText>
+            <Spacer height={10} />
+            <View style={styles.radioContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.radioButton,
+                  selectionMethod === "zip" && styles.radioSelected,
+                ]}
+                onPress={() => setSelectionMethod("zip")}
+              >
+                <ThemedText style={styles.radioText}>Zip Code</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.radioButton,
+                  selectionMethod === "location" && styles.radioSelected,
+                ]}
+                onPress={() => setSelectionMethod("location")}
+              >
+                <ThemedText style={styles.radioText}>Current Location</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            <Spacer height={10} />
+
+            {selectionMethod === "zip" && (
+              <View style={{ width: "100%", alignItems: "center" }}>
+                <ThemedTextInput
+                  style={styles.input}
+                  placeholder="Enter Zip Code"
+                  value={zipCode}
+                  onChangeText={setZipCode}
+                  keyboardType="numeric"
+                  onFocus={() => setIsZipFocused(true)}
+                  onBlur={() => setIsZipFocused(false)}
+                />
+                {isZipFocused && (
+                  <TouchableOpacity
+                    style={styles.hideKeyboardFloating}
+                    onPress={Keyboard.dismiss}
+                  >
+                    <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
+                    <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {selectionMethod === "location" && (
+              <TouchableOpacity style={styles.button} onPress={getLocation}>
+                <ThemedText style={styles.buttonText}>
+                  {location ? "Location Selected!" : "Use Current Location"}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+
+            {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+
+            <Spacer height={15} />
+
+            <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+              <ThemedText style={styles.buttonText}>Submit Donation</ThemedText>
             </TouchableOpacity>
-          )}
 
-          {error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
-          <Spacer height={15} />
-
-          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-            <ThemedText style={styles.buttonText}>Submit Donation</ThemedText>
-          </TouchableOpacity>
-
-          <Spacer height={20} />
-        </ScrollView>
+            <Spacer height={20} />
+          </ScrollView>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
     </ThemedView>
@@ -393,7 +437,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#bcd7f5ff" },
   scrollContent: { padding: 20, alignItems: "center" },
   heading: { fontWeight: "bold", fontSize: 28, color: "#1F2A37", textAlign: "center" },
-  supplyContainer: { flexDirection: "row", justifyContent: "space-between", width: "85%", gap: 10, marginTop: 10 },
+
+  // Supply grid
+  supplyContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "85%",
+    gap: 10,
+    marginTop: 10,
+  },
   column: { flex: 1, gap: 10 },
   itemButton: {
     paddingVertical: 14,
@@ -410,19 +462,15 @@ const styles = StyleSheet.create({
   itemSelected: { backgroundColor: "#4A90E2", borderColor: "#4A90E2", shadowOpacity: 0.2 },
   itemText: { textAlign: "center", color: "#333", fontWeight: "500" },
   itemTextSelected: { textAlign: "center", color: "#fff", fontWeight: "bold" },
-  quantityContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5, gap: 5 },
-  quantityLabel: { fontSize: 12, color: "#666" },
-  quantityInput: {
-    width: 50,
-    height: 30,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    textAlign: "center",
-    backgroundColor: "#fff",
-    color: "#000",
+
+  // Other item input
+  otherInputWrapper: {
+    flexDirection: "row",
+    width: "90%",
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 15,
   },
-  otherInputWrapper: { flexDirection: "row", width: "90%", gap: 10, marginTop: 10, marginBottom: 15 },
   otherInput: {
     flex: 1,
     backgroundColor: "#fff",
@@ -435,35 +483,102 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
-  addButton: { backgroundColor: "#4A90E2", paddingHorizontal: 20, borderRadius: 20, justifyContent: "center" },
+  addButton: {
+    backgroundColor: "#4A90E2",
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    justifyContent: "center",
+  },
   addButtonText: { color: "#fff", fontWeight: "600" },
-  otherItemsList: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12, width: "90%" },
-  otherItemChip: {
+
+  // Selected items summary section
+  selectedItemsContainer: {
+    width: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  selectedItemRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#DCEEFF",
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingLeft: 12,
-    paddingRight: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
     gap: 8,
   },
-  otherItemText: { fontSize: 14, color: "#4A90E2", fontWeight: "500" },
-  quantityMini: { flexDirection: "row", alignItems: "center", gap: 3 },
-  quantityMiniLabel: { fontSize: 11, color: "#4A90E2" },
-  quantityMiniInput: {
-    width: 35,
-    height: 22,
-    borderWidth: 1,
-    borderColor: "#4A90E2",
-    borderRadius: 5,
-    textAlign: "center",
-    backgroundColor: "#fff",
-    fontSize: 11,
-    color: "#000",
+  selectedItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  removeButton: { fontSize: 16, color: "#4A90E2", fontWeight: "bold" },
-  radioContainer: { flexDirection: "row", justifyContent: "space-between", width: "90%", marginTop: 10 },
+  selectedItemNameBox: {
+    width: 80,
+  },
+  selectedItemName: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "500",
+  },
+  removeChipButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FF6B6B",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeChipText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+    lineHeight: 18,
+  },
+  selectedItemQty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  qtyLabel: {
+    fontSize: 11,
+    color: "#888",
+  },
+  qtyInput: {
+    width: 38,
+    height: 30,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    textAlign: "center",
+    backgroundColor: "#f9f9f9",
+    color: "#000",
+    fontSize: 13,
+  },
+  specInput: {
+    flex: 1.4,
+    height: 30,
+    borderWidth: 1,
+    borderColor: "#dde",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    backgroundColor: "#f9f9f9",
+    fontSize: 10,
+    color: "#333",
+    minWidth: 0,
+  },
+
+  // Location / method
+  radioContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "90%",
+    marginTop: 10,
+  },
   radioButton: {
     flex: 1,
     paddingVertical: 12,

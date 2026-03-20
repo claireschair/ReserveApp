@@ -100,6 +100,18 @@ const Profile = () => {
         <ThemedText title style={styles.subheading}>
           {user.label === 'teacher' ? 'Teacher' : 'Parent'}
         </ThemedText>
+        
+        {user?.school && (
+          <>
+            <Spacer height={8} />
+            <View style={styles.schoolBadge}>
+              <Ionicons name="school-outline" size={18} color="#4A90E2" />
+              <ThemedText style={styles.schoolText}>
+                {user.school.schoolName}
+              </ThemedText>
+            </View>
+          </>
+        )}
 
         <View style={[styles.row, { gap: 8 }]}>
         <FontAwesome5 name="school" size={18} color="#4A90E2" />
@@ -304,7 +316,6 @@ const styles = StyleSheet.create({
     color: 'black',
     textAlign: 'center',
   },
-
   subheading: {
     fontSize: 18,       
     fontWeight: '500',    
@@ -314,7 +325,16 @@ const styles = StyleSheet.create({
     zIndex: 1,
     maxWidth: "65%"
   },
-
+  schoolBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  schoolText: {
+    fontSize: 15,
+    color: "#4A90E2",
+    fontWeight: "600",
+  },
   button: {
     width: "50%",
     height: 60,

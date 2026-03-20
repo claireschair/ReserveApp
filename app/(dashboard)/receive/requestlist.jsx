@@ -11,11 +11,49 @@ import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import { Ionicons } from "@expo/vector-icons";
 
+const REQUESTS_PER_PAGE = 5;
+
 function getLocationDisplay(locationData) {
   if (!locationData) return "Not provided";
   if (locationData.zipCode) return `Zip ${locationData.zipCode}`;
   if (locationData.lat && locationData.lng) return "Location provided";
   return "Not provided";
+}
+
+function getSchoolDisplay(userData) {
+  if (!userData?.school) return "No school";
+  return userData.school.schoolName || "Unknown school";
+}
+
+function buildSpecsMap(requestDoc) {
+  const map = {};
+  if (!requestDoc?.items || !requestDoc?.specs) return map;
+  requestDoc.items.forEach((item, idx) => {
+    const spec = requestDoc.specs[idx];
+    if (spec) map[item.toLowerCase()] = spec;
+  });
+  return map;
+}
+
+function ItemsWithSpecs({ items = [], specsMap = {} }) {
+  if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
+  return (
+    <View style={styles.itemSpecList}>
+      {items.map((item, idx) => {
+        const spec = specsMap[item.toLowerCase()];
+        return (
+          <View key={idx} style={styles.itemSpecRow}>
+            <ThemedText style={styles.itemSpecItemName}>
+              {item}
+              {!!spec && (
+                <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>
+              )}
+            </ThemedText>
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 const SORT_LABELS = {
@@ -35,9 +73,9 @@ const RequestList = () => {
     deleteRequest,
   } = useMatch();
 
-  const { getOrCreateChat, getChatByMatchId, closeChat } = useChat();
+  const { getOrCreateChat, getChatByMatchId, markChatAsCompleted } = useChat();
   const { user } = useContext(UserContext);
-  
+
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,6 +88,8 @@ const RequestList = () => {
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [contactEmail, setContactEmail] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [showAllMatches, setShowAllMatches] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadRequests = async () => {
     try {
@@ -70,9 +110,7 @@ const RequestList = () => {
   };
 
   useEffect(() => {
-    if (user?.uid) {
-      loadRequests();
-    }
+    if (user?.uid) loadRequests();
   }, [user?.uid]);
 
   useEffect(() => {
@@ -83,30 +121,20 @@ const RequestList = () => {
       where("userId", "==", user.uid),
       where("type", "==", "receive")
     );
-
     const unsubscribeMyRequests = onSnapshot(
       myRequestsQuery,
-      (snapshot) => {
-        loadRequests();
-      },
-      (error) => {
-        console.error("Error listening to my requests:", error);
-      }
+      () => { loadRequests(); },
+      (error) => { console.error("Error listening to my requests:", error); }
     );
 
     const donationsQuery = query(
       collection(db, "requests"),
       where("type", "==", "donate")
     );
-
     const unsubscribeDonations = onSnapshot(
       donationsQuery,
-      (snapshot) => {
-        loadRequests();
-      },
-      (error) => {
-        console.error("Error listening to donations:", error);
-      }
+      () => { loadRequests(); },
+      (error) => { console.error("Error listening to donations:", error); }
     );
 
     return () => {
@@ -122,7 +150,11 @@ const RequestList = () => {
       const search = searchText.toLowerCase();
       matches = matches.filter((m) => {
         const donationItems = m.partner?.items || [];
-        return donationItems.some(item => item.toLowerCase().includes(search));
+        const partnerSchool = m.partner?.school?.schoolName?.toLowerCase() || "";
+        return (
+          donationItems.some(item => item.toLowerCase().includes(search)) ||
+          partnerSchool.includes(search)
+        );
       });
     }
 
@@ -214,16 +246,12 @@ const RequestList = () => {
       Alert.alert("Error", "Email address is required.");
       return;
     }
-    
     if (!contactEmail.includes('@')) {
       Alert.alert("Error", "Please provide a valid email address.");
       return;
     }
-
     try {
-      await provideRequestorContact(currentRequestId, {
-        email: contactEmail,
-      });
+      await provideRequestorContact(currentRequestId, { email: contactEmail });
       Alert.alert("Success!", "Match complete! You can now coordinate with the donor.");
       setContactModalVisible(false);
       setContactEmail("");
@@ -244,13 +272,9 @@ const RequestList = () => {
           partnerEmail: match.partnerContact.email,
         }
       );
-
       router.push({
         pathname: "/chat/[chatId]",
-        params: { 
-          chatId: chat.id, 
-          matchId: requestId,
-        },
+        params: { chatId: chat.id, matchId: requestId },
       });
     } catch (error) {
       Alert.alert("Error", "Failed to open chat");
@@ -261,25 +285,29 @@ const RequestList = () => {
   const handleDismissMatch = async (requestId) => {
     Alert.alert(
       "Complete Match",
-      "Mark as completed after successfully exchanging items. This will close the chat.",
+      "Mark as completed after successfully exchanging items.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Complete",
           onPress: async () => {
             try {
+              let chatId = null;
               const request = requests.find(r => r.id === requestId);
               if (request) {
                 const match = request.matches?.find(m => m.status === "matched");
-                if (match) {
-                  const chat = await getChatByMatchId(requestId);
+                if (match && match.partner?.id) {
+                  // Get the chat and mark it as completed (not closed)
+                  const chat = await getChatByMatchId(match.partner.id);
                   if (chat) {
-                    await closeChat(chat.id);
+                    chatId = chat.id;
+                    // Mark chat as completed so it shows a friendly message
+                    await markChatAsCompleted(chat.id);
                   }
                 }
               }
               
-              await completeMatch(requestId);
+              await completeMatch(requestId, chatId);
               Alert.alert("Match Completed!", "Thank you for using our service!");
             } catch (err) {
               console.error(err);
@@ -319,6 +347,28 @@ const RequestList = () => {
     setMinScore(0);
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(requests.length / REQUESTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * REQUESTS_PER_PAGE;
+  const endIndex = startIndex + REQUESTS_PER_PAGE;
+  const currentRequests = requests.slice(startIndex, endIndex);
+
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.container}>
@@ -326,24 +376,20 @@ const RequestList = () => {
         <ThemedText>Loading matches...</ThemedText>
       </ThemedView>
     );
-  };
+  }
 
   return (
     <ThemedView style={styles.container}>
       <Spacer height={90} />
       <View style={styles.headerCard}>
-        <ThemedText title style={styles.heading}>
-          Request Matches
-        </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          See donors who match your requests!
-        </ThemedText>
+        <ThemedText title style={styles.heading}>Request Matches</ThemedText>
+        <ThemedText style={styles.subtitle}>See donors who match your requests!</ThemedText>
       </View>
 
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search items..."
+          placeholder="Search items or schools..."
           value={searchText}
           onChangeText={setSearchText}
           placeholderTextColor="#999"
@@ -357,14 +403,12 @@ const RequestList = () => {
           <ThemedText style={styles.filterButtonText}>{showFilters ? "Hide" : "Filter"}</ThemedText>
         </TouchableOpacity>
       </View>
+
       {searchFocused && (
-      <TouchableOpacity
-        style={styles.hideKeyboardButton}
-        onPress={() => Keyboard.dismiss()}
-      >
-        <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" /> 
-        <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.hideKeyboardButton} onPress={() => Keyboard.dismiss()}>
+          <Ionicons name="chevron-down-outline" size={16} color="#4A90E2" />
+          <ThemedText style={styles.hideKeyboardText}>Hide Keyboard</ThemedText>
+        </TouchableOpacity>
       )}
 
       {showFilters && (
@@ -392,17 +436,13 @@ const RequestList = () => {
         <TouchableOpacity style={styles.dropdownButton} onPress={() => setDropdownOpen(!dropdownOpen)}>
           <ThemedText>Sort by: {SORT_LABELS[sortMode]} ▼</ThemedText>
         </TouchableOpacity>
-
         {dropdownOpen && (
           <View style={styles.dropdownMenu}>
             {Object.entries(SORT_LABELS).map(([key, label]) => (
               <TouchableOpacity
                 key={key}
                 style={styles.dropdownItem}
-                onPress={() => {
-                  setSortMode(key);
-                  setDropdownOpen(false);
-                }}
+                onPress={() => { setSortMode(key); setDropdownOpen(false); }}
               >
                 <ThemedText style={sortMode === key && styles.dropdownActiveText}>{label}</ThemedText>
               </TouchableOpacity>
@@ -413,18 +453,15 @@ const RequestList = () => {
 
       <Spacer height={10} />
 
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {requests.length === 0 && (
           <ThemedText style={styles.noMatch}>No requests yet. Create a request to get matches!</ThemedText>
         )}
 
-        {requests.map((request) => {
+        {currentRequests.map((request) => {
           const filteredMatches = filterAndSortMatches(request);
-          
+          const mySpecsMap = buildSpecsMap(request);
+
           const pendingMatch = filteredMatches.find(
             (m) => m.status === "pending" && !m.partnerContact
           );
@@ -441,12 +478,14 @@ const RequestList = () => {
               <View style={styles.requestHeader}>
                 <View style={styles.requestHeaderText}>
                   <ThemedText style={styles.requestTitle}>Requested Items:</ThemedText>
-                  <ThemedText>{(request.items || []).join(", ")}</ThemedText>
+                  <ItemsWithSpecs
+                    items={request.items || []}
+                    specsMap={mySpecsMap}
+                  />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(request.location)}
                   </ThemedText>
                 </View>
-
                 {!pendingMatch && !approvedMatch && !completedMatch && (
                   <TouchableOpacity style={styles.deleteIconButton} onPress={() => handleDeleteRequest(request.id)}>
                     <ThemedText style={styles.deleteIconText}>×</ThemedText>
@@ -493,7 +532,12 @@ const RequestList = () => {
 
                   <View style={styles.matchDetailsBox}>
                     <ThemedText style={styles.matchDetailLabel}>Matched Items:</ThemedText>
-                    <ThemedText style={styles.matchDetailText}>{completedMatch.items?.join(", ") || "N/A"}</ThemedText>
+                    <ItemsWithSpecs
+                      items={completedMatch.items || []}
+                      specsMap={buildSpecsMap(completedMatch.partner)}
+                    />
+                    <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>Donor School:</ThemedText>
+                    <ThemedText style={styles.matchDetailText}>{getSchoolDisplay(completedMatch.partner)}</ThemedText>
                   </View>
 
                   <TouchableOpacity
@@ -516,18 +560,23 @@ const RequestList = () => {
                     You've selected a match. The donor will approve or deny your request soon.
                   </ThemedText>
                   <Spacer height={8} />
-                  <ThemedText style={styles.subtle}>
-                    Donation Items: {pendingMatch.partner?.items?.join(", ") || "N/A"}
+                  <ThemedText style={styles.subtle}>Donation Items:</ThemedText>
+                  <ItemsWithSpecs
+                    items={pendingMatch.partner?.items || []}
+                    specsMap={buildSpecsMap(pendingMatch.partner)}
+                  />
+                  <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
+                    Match Score: {pendingMatch.score || 0}
                   </ThemedText>
-                  <ThemedText style={styles.subtle}>Match Score: {pendingMatch.score || 0}</ThemedText>
-
+                  <ThemedText style={styles.subtle}>
+                    School: {getSchoolDisplay(pendingMatch.partner)}
+                  </ThemedText>
                   <TouchableOpacity
                     style={[styles.selectButton, { marginTop: 10, backgroundColor: "#FF6B6B", borderColor: "#FF6B6B" }]}
                     onPress={() => handleCancelPending(request.id)}
                   >
                     <ThemedText style={{ color: "white", fontWeight: "bold" }}>Cancel Pending Match</ThemedText>
                   </TouchableOpacity>
-
                   <ThemedText style={styles.cancelHint}>Taking too long? You can cancel and try a different match.</ThemedText>
                 </View>
               )}
@@ -538,26 +587,52 @@ const RequestList = () => {
                     {availableMatches.length} potential {availableMatches.length === 1 ? "match" : "matches"} found! Select
                     ONE to send a request to the donor.
                   </ThemedText>
-                  {availableMatches.map((m, index) => (
+                  {availableMatches.slice(0, showAllMatches[request.id] ? undefined : 3).map((m, index) => (
                     <View key={m.id} style={styles.matchCard}>
                       <ThemedText style={styles.matchTitle}>Match #{index + 1}</ThemedText>
                       <ThemedText>
                         Score: {m.score || 0} | Items: {m.items?.length || 0}
                         {m.completeness !== undefined && ` | ${(m.completeness * 100).toFixed(0)}% match`}
                       </ThemedText>
-                      <ThemedText style={styles.itemsList}>Available: {m.partner?.items?.join(", ") || "N/A"}</ThemedText>
+                      <ThemedText style={styles.subtle}>Available:</ThemedText>
+                      <ItemsWithSpecs
+                        items={m.partner?.items || []}
+                        specsMap={buildSpecsMap(m.partner)}
+                      />
                       <ThemedText style={styles.subtle}>
                         Donation Location: {getLocationDisplay(m.partner?.location)}
+                      </ThemedText>
+                      <ThemedText style={styles.subtle}>
+                        School: {getSchoolDisplay(m.partner)}
                       </ThemedText>
                       {m.quantitySufficient === false && (
                         <ThemedText style={styles.warningText}>Note: May not have full quantity needed</ThemedText>
                       )}
-
                       <TouchableOpacity style={[styles.selectButton, { marginTop: 8 }]} onPress={() => handleSelectMatch(m, request)}>
                         <ThemedText>Select this match</ThemedText>
                       </TouchableOpacity>
                     </View>
                   ))}
+                  {availableMatches.length > 3 && (
+                    <TouchableOpacity
+                      style={styles.showMoreButton}
+                      onPress={() => setShowAllMatches(prev => ({
+                        ...prev,
+                        [request.id]: !prev[request.id],
+                      }))}
+                    >
+                      <ThemedText style={styles.showMoreText}>
+                        {showAllMatches[request.id]
+                          ? "Show Less"
+                          : `Show ${availableMatches.length - 3} More Matches`}
+                      </ThemedText>
+                      <Ionicons
+                        name={showAllMatches[request.id] ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color="#4A90E2"
+                      />
+                    </TouchableOpacity>
+                  )}
                 </>
               )}
 
@@ -567,6 +642,63 @@ const RequestList = () => {
             </View>
           );
         })}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <View style={styles.paginationContainer}>
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentPage === 1 && styles.navButtonDisabled,
+              ]}
+              onPress={goToPreviousPage}
+              disabled={currentPage === 1}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={20}
+                color={currentPage === 1 ? "#ccc" : "#4A90E2"}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.pageNumbersContainer}>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <TouchableOpacity
+                  key={pageNum}
+                  style={[
+                    styles.pageButton,
+                    currentPage === pageNum && styles.pageButtonActive,
+                  ]}
+                  onPress={() => goToPage(pageNum)}
+                >
+                  <ThemedText
+                    style={[
+                      styles.pageButtonText,
+                      currentPage === pageNum && styles.pageButtonTextActive,
+                    ]}
+                  >
+                    {pageNum}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentPage === totalPages && styles.navButtonDisabled,
+              ]}
+              onPress={goToNextPage}
+              disabled={currentPage === totalPages}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={currentPage === totalPages ? "#ccc" : "#4A90E2"}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={contactModalVisible} animationType="slide" transparent={true}>
@@ -576,7 +708,6 @@ const RequestList = () => {
             <ThemedText style={styles.modalHint}>
               Provide your email address to exchange contact information.
             </ThemedText>
-
             <TextInput
               style={[styles.input, { color: "#111" }]}
               placeholder="Your Email *"
@@ -586,7 +717,6 @@ const RequestList = () => {
               autoCapitalize="none"
               placeholderTextColor="#666"
             />
-
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 10 }}>
               <TouchableOpacity
                 style={[styles.selectButton, { flex: 1, marginRight: 5, backgroundColor: "#4CAF50" }]}
@@ -615,9 +745,15 @@ const RequestList = () => {
 export default RequestList;
 
 const styles = StyleSheet.create({
+<<<<<<< HEAD
   container: { flex: 1, padding: 15, backgroundColor: "#dee6ff"},
   heading: { 
     fontSize: 22,
+=======
+  container: { flex: 1, padding: 15, backgroundColor: "#dee6ff" },
+  heading: {
+    fontSize: 28,
+>>>>>>> fe62d38eab344ca6be04e2e9003776d2698c98ca
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 5,
@@ -663,26 +799,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
   },
-  filterButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
+  filterButtonText: { color: "white", fontWeight: "bold" },
   filtersContainer: {
     backgroundColor: "#f5f5f5",
     padding: 12,
     borderRadius: 12,
     marginBottom: 10,
   },
-  filterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  filterLabel: {
-    fontSize: 14,
-    marginRight: 10,
-    width: 80,
-  },
+  filterRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  filterLabel: { fontSize: 14, marginRight: 10, width: 80 },
   filterInput: {
     flex: 1,
     backgroundColor: "white",
@@ -754,13 +879,13 @@ const styles = StyleSheet.create({
   matchTitle: { fontWeight: "bold", fontSize: 15 },
   approvedTitle: { fontWeight: "bold", fontSize: 16, color: "#4CAF50" },
   completeTitle: { fontWeight: "bold", fontSize: 16, color: "#2196F3" },
-  contactCard: { backgroundColor: "#E8F5E9", padding: 16, borderRadius: 12, marginTop: 8, borderWidth: 2, borderColor: "#4CAF50" },
+  contactCard: { backgroundColor: "#f0f7ff", padding: 16, borderRadius: 12, marginTop: 8, borderWidth: 2, borderColor: "#4A90E2" },
   contactHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   dismissButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#FF6B6B", justifyContent: "center", alignItems: "center" },
   dismissButtonText: { color: "white", fontSize: 20, fontWeight: "bold" },
   contactInfoBox: { backgroundColor: "white", padding: 12, borderRadius: 8, marginBottom: 8 },
   contactDetail: { fontSize: 15, color: "#333", marginTop: 6, fontWeight: "500" },
-  matchDetailsBox: { backgroundColor: "#F5F5F5", padding: 10, borderRadius: 8, marginBottom: 8 },
+  matchDetailsBox: { backgroundColor: "#ffffff", padding: 10, borderRadius: 8, marginBottom: 8 },
   matchDetailLabel: { fontSize: 13, fontWeight: "bold", color: "#666", marginBottom: 4 },
   matchDetailText: { fontSize: 14, color: "#333" },
   chatButton: {
@@ -776,17 +901,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  chatButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  chatButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   pendingTitle: { fontWeight: "bold", fontSize: 16, color: "#FF9800" },
   sectionTitle: { fontWeight: "bold", fontSize: 14, marginTop: 8, marginBottom: 4 },
   infoText: { fontSize: 13, color: "#555", marginTop: 4, fontStyle: "italic" },
   cancelHint: { fontSize: 12, color: "#666", marginTop: 6, textAlign: "center", fontStyle: "italic" },
   warningText: { fontSize: 12, color: "#FF9800", marginTop: 4, fontStyle: "italic" },
-  itemsList: { fontSize: 14, marginTop: 4, color: "#333" },
   subtle: { fontSize: 12, color: "#666", marginTop: 2 },
   selectButton: {
     marginTop: 5,
@@ -797,13 +917,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0F0FF",
     alignItems: "center",
   },
+  showMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E3F2FD",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 10,
+    gap: 6,
+  },
+  showMoreText: { color: "#4A90E2", fontSize: 14, fontWeight: "600" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     padding: 20,
   },
-  modalContent: { 
+  modalContent: {
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
@@ -814,8 +946,8 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },
   hideKeyboardButton: {
     flexDirection: "row",
-    alignSelf: "flex-end",           // aligns right
-    backgroundColor: "rgba(255,255,255,0.8)", // semi-transparent
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(255,255,255,0.8)",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -833,4 +965,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
+  paginationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  navButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+  },
+  navButtonDisabled: {
+    borderColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+  },
+  pageNumbersContainer: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  pageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  pageButtonActive: {
+    backgroundColor: "#4A90E2",
+    borderColor: "#4A90E2",
+  },
+  pageButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  pageButtonTextActive: {
+    color: "white",
+  },
+  itemSpecList: { marginTop: 4, gap: 2 },
+  itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
+  itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
 });
