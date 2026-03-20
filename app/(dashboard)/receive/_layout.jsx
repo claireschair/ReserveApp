@@ -32,6 +32,7 @@ export default function ReceiveLayout() {
       <Stack.Screen name="wishlist" />
       <Stack.Screen name="form" />
       <Stack.Screen name="requestlist" />
+      <Stack.Screen name="history" />
       <Stack.Screen name="specifications" />
     </Stack>
   );

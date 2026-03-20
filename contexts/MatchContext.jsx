@@ -490,6 +490,66 @@ export function MatchProvider({ children }) {
     return getRequestsWithMatches("receive");
   }
 
+  async function getCompletedMatches(type) {
+    if (!userId) return [];
+    
+    try {
+      const q = query(
+        collection(db, "requests"),
+        where("userId", "==", userId),
+        where("type", "==", type),
+        where("status", "==", "completed")
+      );
+      
+      const snapshot = await getDocs(q);
+      const completed = [];
+      
+      for (const docSnap of snapshot.docs) {
+        const request = { id: docSnap.id, ...docSnap.data() };
+        
+        if (request.match?.partnerId) {
+          const partnerDoc = await getDoc(doc(db, "requests", request.match.partnerId));
+          if (partnerDoc.exists()) {
+            const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
+            const partnerUserData = await getUserData(partnerRequest.userId);
+            
+            const partner = {
+              ...partnerRequest,
+              school: partnerUserData?.school || null,
+              name: partnerUserData?.name || "Unknown",
+            };
+            
+            const donationDoc = type === "donate" ? request : partner;
+            const receiveDoc = type === "receive" ? request : partner;
+            const matchResult = calculateMatchScore(donationDoc, receiveDoc);
+            
+            completed.push({
+              ...request,
+              match: {
+                ...request.match,
+                partner,
+                items: matchResult?.overlap || [],
+                score: matchResult?.score || 0,
+              }
+            });
+          }
+        }
+      }
+      
+      // Sort by completion date, newest first
+      completed.sort((a, b) => {
+        const aTime = a.completedAt?.seconds || 0;
+        const bTime = b.completedAt?.seconds || 0;
+        return bTime - aTime;
+      });
+      
+      return completed;
+    } catch (err) {
+      console.error("Error fetching completed matches:", err);
+      return [];
+    }
+  }
+
   async function createAndSelectMatch(myRequest, theirRequest) {
     if (!userId) return null;
 
@@ -747,7 +807,7 @@ export function MatchProvider({ children }) {
     return true;
   }
 
-  async function completeMatch(requestId) {
+  async function completeMatch(requestId, chatId = null) {
     if (!userId) return null;
 
     const requestDoc = await getDoc(doc(db, "requests", requestId));
@@ -756,10 +816,18 @@ export function MatchProvider({ children }) {
     const request = requestDoc.data();
     const partnerId = request.match?.partnerId;
 
-    await updateDoc(doc(db, "requests", requestId), { status: "completed" });
+    await updateDoc(doc(db, "requests", requestId), { 
+      status: "completed",
+      completedAt: Timestamp.now(),
+      "match.chatId": chatId,
+    });
 
     if (partnerId) {
-      await updateDoc(doc(db, "requests", partnerId), { status: "completed" });
+      await updateDoc(doc(db, "requests", partnerId), { 
+        status: "completed",
+        completedAt: Timestamp.now(),
+        "match.chatId": chatId,
+      });
     }
 
     return true;
@@ -908,6 +976,7 @@ export function MatchProvider({ children }) {
         saveRequest: saveReceiveRequest,
         getRequestsWithMatches: getReceiveRequestsWithMatches,
         getDonationsWithMatches,
+        getCompletedMatches,
         createAndSelectMatch,
         cancelPendingMatch,
         approveDonation: approveMatch,

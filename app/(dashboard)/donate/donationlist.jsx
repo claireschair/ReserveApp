@@ -11,6 +11,8 @@ import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import { Ionicons } from "@expo/vector-icons";
 
+const DONATIONS_PER_PAGE = 5;
+
 function getLocationDisplay(locationData) {
   if (!locationData) return "Not provided";
   if (locationData.zipCode) return `Zip ${locationData.zipCode}`;
@@ -54,6 +56,7 @@ const DonationList = () => {
   const [contactEmail, setContactEmail] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [showAllPending, setShowAllPending] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadDonations = async () => {
     try {
@@ -236,18 +239,20 @@ const DonationList = () => {
           text: "Complete",
           onPress: async () => {
             try {
+              let chatId = null;
               const donation = donations.find(d => d.id === requestId);
               if (donation) {
                 const match = donation.matches?.find(m => m.status === "matched");
                 if (match) {
                   const chat = await getChatByMatchId(requestId);
                   if (chat) {
+                    chatId = chat.id;
                     await closeChat(chat.id);
                   }
                 }
               }
               
-              await completeMatch(requestId);
+              await completeMatch(requestId, chatId);
               Alert.alert("Match Completed!", "Thank you!");
             } catch (err) {
               console.error(err);
@@ -285,6 +290,28 @@ const DonationList = () => {
   const clearFilters = () => {
     setSearchText("");
     setMinScore(0);
+  };
+
+  // Pagination calculations
+  const totalPages = Math.ceil(donations.length / DONATIONS_PER_PAGE);
+  const startIndex = (currentPage - 1) * DONATIONS_PER_PAGE;
+  const endIndex = startIndex + DONATIONS_PER_PAGE;
+  const currentDonations = donations.slice(startIndex, endIndex);
+
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   if (loading) {
@@ -400,7 +427,7 @@ const DonationList = () => {
           </ThemedText>
         )}
 
-        {donations.map((donation) => {
+        {currentDonations.map((donation) => {
           const filteredMatches = filterAndSortMatches(donation);
           
           const pendingRequests = filteredMatches.filter(
@@ -581,6 +608,63 @@ const DonationList = () => {
             </View>
           );
         })}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <View style={styles.paginationContainer}>
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentPage === 1 && styles.navButtonDisabled,
+              ]}
+              onPress={goToPreviousPage}
+              disabled={currentPage === 1}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={20}
+                color={currentPage === 1 ? "#ccc" : "#4A90E2"}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.pageNumbersContainer}>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <TouchableOpacity
+                  key={pageNum}
+                  style={[
+                    styles.pageButton,
+                    currentPage === pageNum && styles.pageButtonActive,
+                  ]}
+                  onPress={() => goToPage(pageNum)}
+                >
+                  <ThemedText
+                    style={[
+                      styles.pageButtonText,
+                      currentPage === pageNum && styles.pageButtonTextActive,
+                    ]}
+                  >
+                    {pageNum}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentPage === totalPages && styles.navButtonDisabled,
+              ]}
+              onPress={goToNextPage}
+              disabled={currentPage === totalPages}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={currentPage === totalPages ? "#ccc" : "#4A90E2"}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={contactModalVisible} animationType="slide" transparent={true}>
@@ -906,5 +990,53 @@ const styles = StyleSheet.create({
     color: "#4A90E2",
     fontSize: 13,
     fontWeight: "500",
+  },
+  paginationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  navButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+  },
+  navButtonDisabled: {
+    borderColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+  },
+  pageNumbersContainer: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  pageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  pageButtonActive: {
+    backgroundColor: "#4A90E2",
+    borderColor: "#4A90E2",
+  },
+  pageButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  pageButtonTextActive: {
+    color: "white",
   },
 });

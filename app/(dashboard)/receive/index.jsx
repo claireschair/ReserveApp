@@ -42,9 +42,13 @@ const Receive = () => {
       description: 'Keep track of all your requests and update their status easily.',
       route: '/(dashboard)/receive/requestlist',
     },
+    {
+      icon: 'time-outline',
+      label: 'Request History',
+      description: 'Browse previously completed requests and chat history.',
+      route: '/(dashboard)/receive/history',
+    },
   ];
-
-  // rest of the file stays exactly the same
 
   return (
     <ThemedView style={styles.container}>

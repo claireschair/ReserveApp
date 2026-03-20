@@ -11,6 +11,8 @@ import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import { Ionicons } from "@expo/vector-icons";
 
+const REQUESTS_PER_PAGE = 5;
+
 function getLocationDisplay(locationData) {
   if (!locationData) return "Not provided";
   if (locationData.zipCode) return `Zip ${locationData.zipCode}`;
@@ -56,6 +58,7 @@ const RequestList = () => {
   const [contactEmail, setContactEmail] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [showAllMatches, setShowAllMatches] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadRequests = async () => {
     try {
@@ -279,18 +282,20 @@ const RequestList = () => {
           text: "Complete",
           onPress: async () => {
             try {
+              let chatId = null;
               const request = requests.find(r => r.id === requestId);
               if (request) {
                 const match = request.matches?.find(m => m.status === "matched");
                 if (match) {
                   const chat = await getChatByMatchId(requestId);
                   if (chat) {
+                    chatId = chat.id;
                     await closeChat(chat.id);
                   }
                 }
               }
               
-              await completeMatch(requestId);
+              await completeMatch(requestId, chatId);
               Alert.alert("Match Completed!", "Thank you for using our service!");
             } catch (err) {
               console.error(err);
@@ -328,6 +333,28 @@ const RequestList = () => {
   const clearFilters = () => {
     setSearchText("");
     setMinScore(0);
+  };
+
+  // Pagination calculations
+  const totalPages = Math.ceil(requests.length / REQUESTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * REQUESTS_PER_PAGE;
+  const endIndex = startIndex + REQUESTS_PER_PAGE;
+  const currentRequests = requests.slice(startIndex, endIndex);
+
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   if (loading) {
@@ -433,7 +460,7 @@ const RequestList = () => {
           <ThemedText style={styles.noMatch}>No requests yet. Create a request to get matches!</ThemedText>
         )}
 
-        {requests.map((request) => {
+        {currentRequests.map((request) => {
           const filteredMatches = filterAndSortMatches(request);
           
           const pendingMatch = filteredMatches.find(
@@ -606,6 +633,63 @@ const RequestList = () => {
             </View>
           );
         })}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <View style={styles.paginationContainer}>
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentPage === 1 && styles.navButtonDisabled,
+              ]}
+              onPress={goToPreviousPage}
+              disabled={currentPage === 1}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={20}
+                color={currentPage === 1 ? "#ccc" : "#4A90E2"}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.pageNumbersContainer}>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <TouchableOpacity
+                  key={pageNum}
+                  style={[
+                    styles.pageButton,
+                    currentPage === pageNum && styles.pageButtonActive,
+                  ]}
+                  onPress={() => goToPage(pageNum)}
+                >
+                  <ThemedText
+                    style={[
+                      styles.pageButtonText,
+                      currentPage === pageNum && styles.pageButtonTextActive,
+                    ]}
+                  >
+                    {pageNum}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentPage === totalPages && styles.navButtonDisabled,
+              ]}
+              onPress={goToNextPage}
+              disabled={currentPage === totalPages}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={currentPage === totalPages ? "#ccc" : "#4A90E2"}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={contactModalVisible} animationType="slide" transparent={true}>
@@ -887,5 +971,53 @@ const styles = StyleSheet.create({
     color: "#4A90E2",
     fontSize: 13,
     fontWeight: "500",
+  },
+  paginationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  navButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+  },
+  navButtonDisabled: {
+    borderColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+  },
+  pageNumbersContainer: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  pageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  pageButtonActive: {
+    backgroundColor: "#4A90E2",
+    borderColor: "#4A90E2",
+  },
+  pageButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  pageButtonTextActive: {
+    color: "white",
   },
 });
