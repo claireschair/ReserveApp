@@ -47,6 +47,8 @@ export function ChatProvider({ children }) {
         lastMessage: null,
         lastMessageTimestamp: null,
         createdAt: serverTimestamp(),
+        closedBy: null,
+        closedReason: null,
       };
 
       const chatRef = await addDoc(collection(db, "chats"), chatData);
@@ -107,12 +109,15 @@ export function ChatProvider({ children }) {
     }
   }
 
-  async function closeChat(chatId) {
+  async function closeChat(chatId, reason = 'completed') {
     if (!userId) return;
 
     try {
       await updateDoc(doc(db, "chats", chatId), {
         status: "closed",
+        closedBy: userId,
+        closedReason: reason,
+        closedAt: serverTimestamp(),
       });
       return true;
     } catch (error) {
