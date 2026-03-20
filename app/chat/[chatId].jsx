@@ -21,6 +21,7 @@ import { UserContext } from "../../contexts/UserContext";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
+import { Ionicons } from "@expo/vector-icons";
 
 const PERSPECTIVE_API_KEY = process.env.EXPO_PUBLIC_PERSPECTIVE_API_KEY;
 const bannedWords = [
@@ -47,13 +48,11 @@ const scamKeywords = [
   "urgent payment",
   "click this link",
 ];
-//console.log("Perspective key exists:", !!process.env.EXPO_PUBLIC_PERSPECTIVE_API_KEY);
 
 async function moderateMessage(text) {
   try {
     const lowerText = text.toLowerCase();
 
-    // profanity check
     for (const word of bannedWords) {
       if (lowerText.includes(word)) {
         return {
@@ -63,7 +62,6 @@ async function moderateMessage(text) {
       }
     }
 
-    //scam keyword detection
     for (const phrase of scamKeywords) {
       if (lowerText.includes(phrase)) {
         return {
@@ -73,7 +71,6 @@ async function moderateMessage(text) {
       }
     }
 
-    // link detection
     const linkRegex = /(https?:\/\/|www\.)/i;
     if (linkRegex.test(text)) {
       return {
@@ -82,7 +79,6 @@ async function moderateMessage(text) {
       };
     }
 
-    // Perspective API moderation
     const response = await fetch(
       `https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze?key=${PERSPECTIVE_API_KEY}`,
       {
@@ -111,7 +107,6 @@ async function moderateMessage(text) {
     }
 
     const data = await response.json();
-
     const scores = data.attributeScores;
 
     const toxicity = scores?.TOXICITY?.summaryScore?.value ?? 0;
@@ -121,19 +116,7 @@ async function moderateMessage(text) {
     const profanity = scores?.PROFANITY?.summaryScore?.value ?? 0;
     const sexual = scores?.SEXUAL_CONTENT?.summaryScore?.value ?? 0;
     const identityAttack = scores?.IDENTITY_ATTACK?.summaryScore?.value ?? 0;
-    
 
-    console.log("Perspective scores:", {
-      toxicity,
-      severeToxicity,
-      insult,
-      threat,
-      profanity,
-      sexual,
-      identityAttack,
-    });
-
-    // moderation thresholds
     if (
       toxicity > 0.80 ||
       severeToxicity > 0.60 ||
@@ -159,12 +142,9 @@ async function moderateMessage(text) {
 
   } catch (error) {
     console.warn("Perspective moderation error:", error);
-
-    // allow message if API fails
     return { allowed: true, reason: "" };
   }
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 const REPORT_REASONS = [
   { value: "inappropriate_language", label: "Inappropriate Language" },
@@ -186,7 +166,7 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
-  const [moderating, setModerating] = useState(false); // true while AI check is in flight
+  const [moderating, setModerating] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState("");
   const [reportDescription, setReportDescription] = useState("");
@@ -196,7 +176,6 @@ const ChatScreen = () => {
   const [iClosedChat, setIClosedChat] = useState(false);
   const flatListRef = useRef(null);
 
-  // Get chat data and partner ID on mount
   useEffect(() => {
     if (!chatId || !user?.uid) return;
 
@@ -210,8 +189,6 @@ const ChatScreen = () => {
           const partner = data.participants?.find((id) => id !== user.uid);
           if (partner) {
             setPartnerUserId(partner);
-          } else {
-            console.error("Could not find partner in participants");
           }
         }
       } catch (error) {
@@ -230,11 +207,13 @@ const ChatScreen = () => {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
+          setChatData(data);
 
-          if (data.status === "closed" && !iClosedChat) {
+          // Only show alert if chat was closed by reporting (not by match completion)
+          if (data.status === "closed" && !data.matchCompleted && !iClosedChat) {
             Alert.alert(
               "Chat Closed",
-              "This chat has been closed because you have been reported for violating community guidelines.",
+              "This chat has been closed for violating community guidelines.",
               [{ text: "OK", onPress: () => router.back() }]
             );
           }
@@ -269,9 +248,6 @@ const ChatScreen = () => {
     }
   }, [messages]);
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // handleSend — runs AI moderation before every outbound message
-  // ───────────────────────────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!inputText.trim() || sending || moderating) return;
 
@@ -283,11 +259,10 @@ const ChatScreen = () => {
       const { allowed, reason } = await moderateMessage(messageText);
 
       if (!allowed) {
-        // Restore the draft so the user can edit rather than retype
         setInputText(messageText);
         Alert.alert(
           "Message Blocked",
-          reason || "Your message wasn't sent because it may violate our community guidelines. Please review and try again."
+          reason || "Your message wasn't sent because it may violate our community guidelines."
         );
         return;
       }
@@ -314,7 +289,7 @@ const ChatScreen = () => {
     if (alreadyReported) {
       Alert.alert(
         "Already Reported",
-        "You have already submitted a report for this user. Our moderators will review it soon."
+        "You have already submitted a report for this user."
       );
       return;
     }
@@ -324,12 +299,12 @@ const ChatScreen = () => {
 
   const handleSubmitReport = async () => {
     if (!selectedReason) {
-      Alert.alert("Error", "Please select a reason for the report");
+      Alert.alert("Error", "Please select a reason");
       return;
     }
 
     if (!reportDescription.trim()) {
-      Alert.alert("Error", "Please provide a description of the issue");
+      Alert.alert("Error", "Please provide a description");
       return;
     }
 
@@ -343,7 +318,7 @@ const ChatScreen = () => {
 
       setIClosedChat(true);
 
-      if (chatId) await closeChat(chatId);
+      if (chatId) await closeChat(chatId, 'reported');
       if (matchId) await completeMatch(matchId);
 
       setReportModalVisible(false);
@@ -352,12 +327,12 @@ const ChatScreen = () => {
 
       Alert.alert(
         "Report Submitted",
-        "Thank you for reporting this issue. The chat has been closed and the match has been completed. Our moderators will review your report.",
+        "Thank you. The chat has been closed. Our moderators will review your report.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (error) {
       console.error("Error submitting report:", error);
-      Alert.alert("Error", "Failed to submit report. Please try again.");
+      Alert.alert("Error", "Failed to submit report.");
     } finally {
       setSubmittingReport(false);
     }
@@ -412,9 +387,17 @@ const ChatScreen = () => {
     );
   };
 
-  // Send button is busy while either moderating or sending
   const isBusy = moderating || sending;
   const sendLabel = moderating ? "Checking..." : sending ? "..." : "Send";
+
+  // Check if chat is completed (match finished successfully)
+  const isCompleted = chatData?.matchCompleted === true;
+  
+  // Check if chat is closed (reported/violating guidelines)
+  const isClosed = chatData?.status === "closed" && !isCompleted;
+
+  // Determine if user can send messages
+  const canSendMessages = !isCompleted && !isClosed && chatData?.status === "active";
 
   return (
     <ThemedView style={styles.container}>
@@ -425,10 +408,39 @@ const ChatScreen = () => {
           <ThemedText style={styles.backButton}>← Back</ThemedText>
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Match Chat</ThemedText>
-        <TouchableOpacity onPress={handleOpenReportModal}>
-          <ThemedText style={styles.reportButton}>Report</ThemedText>
-        </TouchableOpacity>
+        {!isCompleted && !isClosed && (
+          <TouchableOpacity onPress={handleOpenReportModal}>
+            <ThemedText style={styles.reportButton}>Report</ThemedText>
+          </TouchableOpacity>
+        )}
+        {(isCompleted || isClosed) && <View style={{ width: 60 }} />}
       </View>
+
+      {/* Completed Match Banner */}
+      {isCompleted && (
+        <View style={styles.completedBanner}>
+          <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+          <View style={styles.completedTextContainer}>
+            <ThemedText style={styles.completedTitle}>Match Completed!</ThemedText>
+            <ThemedText style={styles.completedMessage}>
+              This exchange was successfully completed. Chat is now read-only.
+            </ThemedText>
+          </View>
+        </View>
+      )}
+
+      {/* Closed Chat Warning */}
+      {isClosed && (
+        <View style={styles.closedBanner}>
+          <Ionicons name="ban" size={24} color="#FF6B6B" />
+          <View style={styles.closedTextContainer}>
+            <ThemedText style={styles.closedTitle}>Chat Closed</ThemedText>
+            <ThemedText style={styles.closedMessage}>
+              This chat has been closed for violating community guidelines.
+            </ThemedText>
+          </View>
+        </View>
+      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -455,30 +467,42 @@ const ChatScreen = () => {
           }
         />
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type a message..."
-            placeholderTextColor="#999"
-            multiline
-            maxLength={1000}
-            returnKeyType="default"
-            blurOnSubmit={false}
-            editable={!isBusy}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isBusy) && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || isBusy}
-          >
-            <ThemedText style={styles.sendButtonText}>{sendLabel}</ThemedText>
-          </TouchableOpacity>
-        </View>
+        {/* Only show input if chat is active and not completed */}
+        {canSendMessages && (
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Type a message..."
+              placeholderTextColor="#999"
+              multiline
+              maxLength={1000}
+              returnKeyType="default"
+              blurOnSubmit={false}
+              editable={!isBusy}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isBusy) && styles.sendButtonDisabled,
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || isBusy}
+            >
+              <ThemedText style={styles.sendButtonText}>{sendLabel}</ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Show read-only message if completed or closed */}
+        {(isCompleted || isClosed) && (
+          <View style={styles.readOnlyContainer}>
+            <ThemedText style={styles.readOnlyText}>
+              {isCompleted ? "✓ Chat is read-only" : "⚠ Chat has been closed"}
+            </ThemedText>
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       <Modal
@@ -495,7 +519,7 @@ const ChatScreen = () => {
             <View style={styles.modalContent}>
               <ThemedText style={styles.modalTitle}>Report User</ThemedText>
               <ThemedText style={styles.modalSubtitle}>
-                Help us keep the community safe. What's the issue?
+                Help us keep the community safe.
               </ThemedText>
 
               <ScrollView style={styles.reasonsScroll}>
@@ -558,7 +582,7 @@ const ChatScreen = () => {
                   disabled={submittingReport}
                 >
                   <ThemedText style={styles.submitButtonText}>
-                    {submittingReport ? "Submitting..." : "Submit Report"}
+                    {submittingReport ? "Submitting..." : "Submit"}
                   </ThemedText>
                 </TouchableOpacity>
               </View>
@@ -599,6 +623,52 @@ const styles = StyleSheet.create({
     color: "#FF6B6B",
     fontSize: 14,
     fontWeight: "600",
+  },
+  completedBanner: {
+    flexDirection: "row",
+    backgroundColor: "#E8F5E9",
+    padding: 16,
+    alignItems: "center",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#A5D6A7",
+  },
+  completedTextContainer: {
+    flex: 1,
+  },
+  completedTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2E7D32",
+    marginBottom: 4,
+  },
+  completedMessage: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 18,
+  },
+  closedBanner: {
+    flexDirection: "row",
+    backgroundColor: "#FFEBEE",
+    padding: 16,
+    alignItems: "center",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EF9A9A",
+  },
+  closedTextContainer: {
+    flex: 1,
+  },
+  closedTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#C62828",
+    marginBottom: 4,
+  },
+  closedMessage: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 18,
   },
   emptyState: {
     flex: 1,
@@ -694,6 +764,18 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "600",
     fontSize: 15,
+  },
+  readOnlyContainer: {
+    padding: 12,
+    backgroundColor: "#f5f5f5",
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+    alignItems: "center",
+  },
+  readOnlyText: {
+    fontSize: 13,
+    color: "#666",
+    fontStyle: "italic",
   },
   modalOverlay: {
     flex: 1,

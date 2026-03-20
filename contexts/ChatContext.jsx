@@ -109,6 +109,22 @@ export function ChatProvider({ children }) {
     }
   }
 
+  async function markChatAsCompleted(chatId) {
+    if (!userId) return;
+
+    try {
+      await updateDoc(doc(db, "chats", chatId), {
+        matchCompleted: true,
+        completedAt: serverTimestamp(),
+        completedBy: userId,
+      });
+      return true;
+    } catch (error) {
+      console.error("Error marking chat as completed:", error);
+      throw error;
+    }
+  }
+
   async function closeChat(chatId, reason = 'completed') {
     if (!userId) return;
 
@@ -196,6 +212,7 @@ export function ChatProvider({ children }) {
         getOrCreateChat,
         sendMessage,
         markMessagesAsRead,
+        markChatAsCompleted,
         closeChat,
         subscribeToMessages,
         getChatByMatchId,

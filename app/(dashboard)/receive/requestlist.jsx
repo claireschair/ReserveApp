@@ -73,7 +73,7 @@ const RequestList = () => {
     deleteRequest,
   } = useMatch();
 
-  const { getOrCreateChat, getChatByMatchId, closeChat } = useChat();
+  const { getOrCreateChat, getChatByMatchId, markChatAsCompleted } = useChat();
   const { user } = useContext(UserContext);
 
   const [requests, setRequests] = useState([]);
@@ -285,7 +285,7 @@ const RequestList = () => {
   const handleDismissMatch = async (requestId) => {
     Alert.alert(
       "Complete Match",
-      "Mark as completed after successfully exchanging items. This will close the chat.",
+      "Mark as completed after successfully exchanging items.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -297,11 +297,12 @@ const RequestList = () => {
               if (request) {
                 const match = request.matches?.find(m => m.status === "matched");
                 if (match && match.partner?.id) {
-                  // Use match.partner.id (donation ID) because that's what was used in getOrCreateChat
+                  // Get the chat and mark it as completed (not closed)
                   const chat = await getChatByMatchId(match.partner.id);
                   if (chat) {
                     chatId = chat.id;
-                    await closeChat(chat.id, 'completed');
+                    // Mark chat as completed so it shows a friendly message
+                    await markChatAsCompleted(chat.id);
                   }
                 }
               }
