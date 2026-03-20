@@ -136,7 +136,7 @@ async function moderateMessage(text) {
     // moderation thresholds
     if (
       toxicity > 0.80 ||
-      severeToxicity > 0.70 ||
+      severeToxicity > 0.60 ||
       insult > 0.80 ||
       threat > 0.5 ||
       sexual > 0.7 ||
