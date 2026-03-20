@@ -113,13 +113,6 @@ const Profile = () => {
           </>
         )}
 
-        <View style={[styles.row, { gap: 8 }]}>
-        <FontAwesome5 name="school" size={18} color="#4A90E2" />
-        <ThemedText title style={styles.subheading}>
-          {user.school?.schoolName ?? userData?.school ?? null}
-        </ThemedText>
-        </View>
-
         <Spacer height={5} />
       </View>
 

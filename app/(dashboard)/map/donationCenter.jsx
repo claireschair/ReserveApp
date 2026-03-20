@@ -20,6 +20,7 @@ import { useMap } from "../../../hooks/useMap";
 import { Ionicons } from "@expo/vector-icons";
 
 import PlaceSearchInput from "./PlaceSearchInput";
+import AppBackButton from "../../../components/AppBackButton"; 
 
 const SelectDonationLocation = () => {
   const { saveDonationCenter } = useMap();
@@ -150,6 +151,9 @@ const SelectDonationLocation = () => {
 
   return (
     <ThemedView style={styles.container}>
+      <View style={styles.backButtonContainer}>
+        <AppBackButton />
+      </View>
       <View style={styles.searchOverlay}>
         <PlaceSearchInput
           onSelect={({ name, latitude, longitude }) => {
@@ -555,5 +559,11 @@ const styles = StyleSheet.create({
   },
   hideKeyboardText: {
     color: "#4A90E2",
+  },
+  backButtonContainer: {
+    position: "absolute",
+    top: 150, 
+    left: 16,
+    zIndex: 2000,
   },
 });
