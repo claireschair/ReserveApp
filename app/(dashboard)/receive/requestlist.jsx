@@ -296,11 +296,12 @@ const RequestList = () => {
               const request = requests.find(r => r.id === requestId);
               if (request) {
                 const match = request.matches?.find(m => m.status === "matched");
-                if (match) {
-                  const chat = await getChatByMatchId(requestId);
+                if (match && match.partner?.id) {
+                  // Use match.partner.id (donation ID) because that's what was used in getOrCreateChat
+                  const chat = await getChatByMatchId(match.partner.id);
                   if (chat) {
                     chatId = chat.id;
-                    await closeChat(chat.id);
+                    await closeChat(chat.id, 'completed');
                   }
                 }
               }

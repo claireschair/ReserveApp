@@ -266,7 +266,7 @@ const DonationList = () => {
                   const chat = await getChatByMatchId(requestId);
                   if (chat) {
                     chatId = chat.id;
-                    await closeChat(chat.id);
+                    await closeChat(chat.id, 'completed');
                   }
                 }
               }

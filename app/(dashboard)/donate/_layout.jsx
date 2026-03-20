@@ -33,7 +33,6 @@ export default function DonateLayout() {
       <Stack.Screen name="form" />
       <Stack.Screen name="donationlist" />
       <Stack.Screen name="history" />
-      <Stack.Screen name="specifications" />
     </Stack>
   );
 }
