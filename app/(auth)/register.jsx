@@ -24,11 +24,11 @@ const Register = () => {
   const [schoolResults, setSchoolResults] = useState([])
   const [schoolSearching, setSchoolSearching] = useState(false)
   const [selectedSchool, setSelectedSchool] = useState(null)
+  const [isCustomSchool, setIsCustomSchool] = useState(false)
+  const [customSchool, setCustomSchool] = useState("")
   const searchTimeout = useRef(null)
   const [selectedState, setSelectedState] = useState("")
-  const [stateDropdownOpen, setStateDropdownOpen] = useState(false)
   const router = useRouter()
-  
 
   const { register } = useUser()
 
@@ -49,14 +49,9 @@ const Register = () => {
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}+school+${selectedState}&format=json&addressdetails=1&limit=8&countrycodes=us`,
-          {
-            headers: {
-              'User-Agent': 'Reserve'
-            }
-          }
+          { headers: { 'User-Agent': 'Reserve' } }
         )
         const data = await res.json()
-        console.log("Results:", JSON.stringify(data[0]))
         setSchoolResults(data || [])
       } catch (error) {
         console.error("School search error:", error)
@@ -65,10 +60,35 @@ const Register = () => {
       }
     }, 500)
   }
+
   const handleSelectSchool = (s) => {
     setSelectedSchool(s)
     setSchool(s.name || s.display_name.split(",")[0])
     setSchoolResults([])
+    setIsCustomSchool(false)
+  }
+
+  const handleSelectOther = () => {
+    setSchoolResults([])
+    setIsCustomSchool(true)
+    setSchool("")
+    setSelectedSchool(null)
+  }
+
+  const handleCustomSchoolChange = (text) => {
+    setCustomSchool(text)
+    if (text.trim()) {
+      setSelectedSchool({ name: text, place_id: "custom", isCustom: true })
+    } else {
+      setSelectedSchool(null)
+    }
+  }
+
+  const handleBackToSearch = () => {
+    setIsCustomSchool(false)
+    setCustomSchool("")
+    setSelectedSchool(null)
+    setSchool("")
   }
 
   const handleSubmit = async () => {
@@ -96,12 +116,13 @@ const Register = () => {
 
     try {
       await register(email, password, name, label.toLowerCase(), {
-        schoolName: selectedSchool.name || selectedSchool.display_name.split(",")[0],
+        schoolName: selectedSchool.isCustom
+          ? selectedSchool.name
+          : selectedSchool.name || selectedSchool.display_name.split(",")[0],
         schoolId: selectedSchool.place_id,
-        city: selectedSchool.address?.city || selectedSchool.address?.town || "",
-        state: selectedSchool.address?.state || selectedState,
+        city: selectedSchool.isCustom ? "" : selectedSchool.address?.city || selectedSchool.address?.town || "",
+        state: selectedSchool.isCustom ? "" : selectedSchool.address?.state || selectedState,
       })
-      // Pass credentials so verify-email screen can resend if needed
       router.replace({
         pathname: "/(auth)/verify-email",
         params: { email, password },
@@ -115,6 +136,9 @@ const Register = () => {
     setLabel(selectedLabel)
     setDropdownOpen(false)
   }
+
+  const showOtherLink = !schoolSearching && school.length >= 3 && schoolResults.length === 0
+  const showOtherInDropdown = !schoolSearching && schoolResults.length > 0
 
   return (
     <TouchableWithoutFeedback
@@ -178,47 +202,85 @@ const Register = () => {
                 </View>
               )}
             </View>
-            
-            
-            
+
             {/* SCHOOL SEARCH */}
             <View style={[styles.dropdownContainer, { zIndex: 1000 }]}>
-              <ThemedTextInput
-                style={[
-                  styles.input,
-                  { width: "100%", marginBottom: 0 },
-                  selectedSchool && styles.inputSuccess
-                ]}
-                placeholder="Search your affiliated school"
-                value={school}
-                onChangeText={searchSchools}
-              />
+              {isCustomSchool ? (
+                // Custom school input
+                <View>
+                  <ThemedTextInput
+                    style={[
+                      styles.input,
+                      { width: "100%", marginBottom: 6 },
+                      customSchool.trim() && styles.inputSuccess,
+                    ]}
+                    placeholder="Enter your school name"
+                    value={customSchool}
+                    onChangeText={handleCustomSchoolChange}
+                    autoFocus
+                  />
+                  <TouchableOpacity onPress={handleBackToSearch} style={styles.otherLink}>
+                    <ThemedText style={styles.otherLinkText}>← Back to search</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                // School search input + results
+                <>
+                  <ThemedTextInput
+                    style={[
+                      styles.input,
+                      { width: "100%", marginBottom: 0 },
+                      selectedSchool && styles.inputSuccess,
+                    ]}
+                    placeholder="Search your affiliated school"
+                    value={school}
+                    onChangeText={searchSchools}
+                  />
 
-              {schoolSearching && (
-                <ThemedText style={styles.searchingText}>Searching...</ThemedText>
-              )}
+                  {schoolSearching && (
+                    <ThemedText style={styles.searchingText}>Searching...</ThemedText>
+                  )}
 
-              {!schoolSearching && schoolResults.length > 0 && (
-                <View style={styles.schoolDropdownMenu}>
-                  {schoolResults.map((s) => (
-                    <TouchableOpacity
-                      key={s.place_id}
-                      style={styles.dropdownItem}
-                      onPress={() => handleSelectSchool(s)}
-                    >
-                      <ThemedText style={styles.schoolName}>
-                        {s.name || s.display_name.split(",")[0]}
-                      </ThemedText>
-                      <ThemedText style={styles.schoolLocation}>
-                        {s.address?.city || s.address?.town || s.address?.county}, {s.address?.state}
+                  {showOtherInDropdown && (
+                    <View style={styles.schoolDropdownMenu}>
+                      {schoolResults.map((s) => (
+                        <TouchableOpacity
+                          key={s.place_id}
+                          style={styles.dropdownItem}
+                          onPress={() => handleSelectSchool(s)}
+                        >
+                          <ThemedText style={styles.schoolName}>
+                            {s.name || s.display_name.split(",")[0]}
+                          </ThemedText>
+                          <ThemedText style={styles.schoolLocation}>
+                            {s.address?.city || s.address?.town || s.address?.county}, {s.address?.state}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      ))}
+
+                      {/* Other option at bottom of results */}
+                      <TouchableOpacity
+                        style={[styles.dropdownItem, styles.otherDropdownItem]}
+                        onPress={handleSelectOther}
+                      >
+                        <ThemedText style={styles.otherLinkText}>
+                          Can't find your school? Enter it manually
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Other link shown below input when search yields no results */}
+                  {showOtherLink && (
+                    <TouchableOpacity onPress={handleSelectOther} style={styles.otherLink}>
+                      <ThemedText style={styles.otherLinkText}>
+                        Can't find your school? Enter it manually
                       </ThemedText>
                     </TouchableOpacity>
-                  ))}
-                </View>
+                  )}
+                </>
               )}
             </View>
-
-            
 
             {/* EMAIL */}
             <ThemedTextInput
@@ -255,7 +317,6 @@ const Register = () => {
               <Text style={{ color: "#f2f2f2" }}>Register</Text>
             </ThemedButton>
 
-
             {error && <Text style={styles.error}>{error}</Text>}
 
             <Spacer height={40} />
@@ -290,7 +351,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#ffffff",
     width: "85%",
-    //paddingVertical: 20,
     paddingHorizontal: 25,
     borderRadius: 30,
     alignItems: "center",
@@ -305,7 +365,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "600",
     marginBottom: 10,
-    color: "#1f2937"
+    color: "#1f2937",
   },
   subtitle: {
     fontSize: 16,
@@ -406,6 +466,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f4ff",
   },
+  otherDropdownItem: {
+    borderBottomWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e7ff",
+  },
   selectedOptionText: {
     fontWeight: "600",
     color: "#4A90E2",
@@ -425,6 +490,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
     marginTop: 2,
+  },
+  otherLink: {
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  otherLinkText: {
+    fontSize: 13,
+    color: "#4A90E2",
+    fontWeight: "500",
   },
   checkboxRow: {
     flexDirection: "row",
@@ -455,21 +529,5 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     fontSize: 14,
     flex: 1,
-  },
-  stateDropdownMenu: {
-    position: "absolute",
-    top: 55,
-    left: 0,
-    right: 0,
-    backgroundColor: "white",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#e0e7ff",
-    maxHeight: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 15,
   },
 })
