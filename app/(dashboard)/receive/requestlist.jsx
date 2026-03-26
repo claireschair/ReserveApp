@@ -25,10 +25,6 @@ function getSchoolDisplay(userData) {
   return userData.school.schoolName || "Unknown school";
 }
 
-/**
- * Build a { itemNameLower: specString } map from a request doc's
- * parallel items[] and specs[] arrays.
- */
 function buildSpecsMap(requestDoc) {
   const map = {};
   if (!requestDoc?.items || !requestDoc?.specs) return map;
@@ -39,38 +35,16 @@ function buildSpecsMap(requestDoc) {
   return map;
 }
 
-/**
- * Build a { itemNameLower: quantity } map from a request doc's
- * parallel items[] and quantities[] arrays.
- */
-function buildQuantitiesMap(requestDoc) {
-  const map = {};
-  if (!requestDoc?.items || !requestDoc?.quantities) return map;
-  requestDoc.items.forEach((item, idx) => {
-    const qty = requestDoc.quantities[idx];
-    if (qty != null) map[item.toLowerCase()] = qty;
-  });
-  return map;
-}
-
-/**
- * Renders each item as "ItemName (quantity) - spec"
- * quantity and spec are each omitted if not present.
- */
-function ItemsWithSpecs({ items = [], specsMap = {}, quantitiesMap = {} }) {
+function ItemsWithSpecs({ items = [], specsMap = {} }) {
   if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
   return (
     <View style={styles.itemSpecList}>
       {items.map((item, idx) => {
         const spec = specsMap[item.toLowerCase()];
-        const qty = quantitiesMap[item.toLowerCase()];
         return (
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
               {item}
-              {qty != null && (
-                <ThemedText style={styles.itemSpecQty}> ({qty})</ThemedText>
-              )}
               {!!spec && (
                 <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>
               )}
@@ -393,9 +367,11 @@ const RequestList = () => {
               if (request) {
                 const match = request.matches?.find(m => m.status === "matched");
                 if (match && match.partner?.id) {
+                  // Get the chat and mark it as completed (not closed)
                   const chat = await getChatByMatchId(match.partner.id);
                   if (chat) {
                     chatId = chat.id;
+                    // Mark chat as completed so it shows a friendly message
                     await markChatAsCompleted(chat.id);
                   }
                 }
@@ -459,14 +435,27 @@ const RequestList = () => {
     setMinScore(0);
   };
 
+  // Pagination calculations
   const totalPages = Math.ceil(requests.length / REQUESTS_PER_PAGE);
   const startIndex = (currentPage - 1) * REQUESTS_PER_PAGE;
   const endIndex = startIndex + REQUESTS_PER_PAGE;
   const currentRequests = requests.slice(startIndex, endIndex);
 
-  const goToPage = (pageNumber) => setCurrentPage(pageNumber);
-  const goToPreviousPage = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
-  const goToNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   if (loading) {
     return (
@@ -479,7 +468,7 @@ const RequestList = () => {
 
   return (
     <ThemedView style={styles.container}>
-      <Spacer height={90} />
+      <Spacer height={100} />
       <View style={styles.headerCard}>
         <ThemedText title style={styles.heading}>Request Matches</ThemedText>
         <ThemedText style={styles.subtitle}>See donors who match your requests!</ThemedText>
@@ -560,7 +549,6 @@ const RequestList = () => {
         {currentRequests.map((request) => {
           const filteredMatches = filterAndSortMatches(request);
           const mySpecsMap = buildSpecsMap(request);
-          const myQuantitiesMap = buildQuantitiesMap(request);
 
           const pendingMatch = filteredMatches.find(
             (m) => m.status === "pending" && !m.partnerContact
@@ -581,7 +569,6 @@ const RequestList = () => {
                   <ItemsWithSpecs
                     items={request.items || []}
                     specsMap={mySpecsMap}
-                    quantitiesMap={myQuantitiesMap}
                   />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(request.location)}
@@ -636,7 +623,6 @@ const RequestList = () => {
                     <ItemsWithSpecs
                       items={completedMatch.items || []}
                       specsMap={buildSpecsMap(completedMatch.partner)}
-                      quantitiesMap={buildQuantitiesMap(completedMatch.partner)}
                     />
                     <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>Donor School:</ThemedText>
                     <ThemedText style={styles.matchDetailText}>{getSchoolDisplay(completedMatch.partner)}</ThemedText>
@@ -666,7 +652,6 @@ const RequestList = () => {
                   <ItemsWithSpecs
                     items={pendingMatch.partner?.items || []}
                     specsMap={buildSpecsMap(pendingMatch.partner)}
-                    quantitiesMap={buildQuantitiesMap(pendingMatch.partner)}
                   />
                   <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
                     Match Score: {pendingMatch.score || 0}
@@ -701,7 +686,6 @@ const RequestList = () => {
                       <ItemsWithSpecs
                         items={m.partner?.items || []}
                         specsMap={buildSpecsMap(m.partner)}
-                        quantitiesMap={buildQuantitiesMap(m.partner)}
                       />
                       <ThemedText style={styles.subtle}>
                         Donation Location: {getLocationDisplay(m.partner?.location)}
@@ -751,7 +735,10 @@ const RequestList = () => {
         {totalPages > 1 && (
           <View style={styles.paginationContainer}>
             <TouchableOpacity
-              style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+              style={[
+                styles.navButton,
+                currentPage === 1 && styles.navButtonDisabled,
+              ]}
               onPress={goToPreviousPage}
               disabled={currentPage === 1}
             >
@@ -766,7 +753,10 @@ const RequestList = () => {
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                 <TouchableOpacity
                   key={pageNum}
-                  style={[styles.pageButton, currentPage === pageNum && styles.pageButtonActive]}
+                  style={[
+                    styles.pageButton,
+                    currentPage === pageNum && styles.pageButtonActive,
+                  ]}
                   onPress={() => goToPage(pageNum)}
                 >
                   <ThemedText
@@ -782,7 +772,10 @@ const RequestList = () => {
             </View>
 
             <TouchableOpacity
-              style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+              style={[
+                styles.navButton,
+                currentPage === totalPages && styles.navButtonDisabled,
+              ]}
               onPress={goToNextPage}
               disabled={currentPage === totalPages}
             >
@@ -842,7 +835,7 @@ export default RequestList;
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 15, backgroundColor: "#dee6ff" },
   heading: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 5,
@@ -850,7 +843,7 @@ const styles = StyleSheet.create({
   },
   headerCard: {
     backgroundColor: "#699cea",
-    paddingVertical: 18,
+    paddingVertical: 22,
     paddingHorizontal: 24,
     borderRadius: 30,
     alignSelf: "center",
@@ -862,7 +855,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: "center",
     color: "#e2f0ff",
     lineHeight: 22,
@@ -1049,7 +1042,11 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 20,
   },
-  hideKeyboardText: { color: "#4A90E2", fontSize: 13, fontWeight: "500" },
+  hideKeyboardText: {
+    color: "#4A90E2",
+    fontSize: 13,
+    fontWeight: "500",
+  },
   paginationContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1101,6 +1098,5 @@ const styles = StyleSheet.create({
   itemSpecList: { marginTop: 4, gap: 2 },
   itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
-  itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
 });
