@@ -40,37 +40,20 @@ function buildSpecsMap(requestDoc) {
 }
 
 /**
- * Build a { itemNameLower: quantity } map from a request doc's
- * parallel items[] and quantities[] arrays.
+ * Renders each item on its own row as "ItemName - spec" (spec omitted if empty).
+ * Single-word item names shrink font to stay on one line; multi-word names
+ * wrap naturally.
  */
-function buildQuantitiesMap(requestDoc) {
-  const map = {};
-  if (!requestDoc?.items || !requestDoc?.quantities) return map;
-  requestDoc.items.forEach((item, idx) => {
-    const qty = requestDoc.quantities[idx];
-    if (qty != null) map[item.toLowerCase()] = qty;
-  });
-  return map;
-}
-
-/**
- * Renders each item as "ItemName (quantity) - spec"
- * quantity and spec are each omitted if not present.
- */
-function ItemsWithSpecs({ items = [], specsMap = {}, quantitiesMap = {} }) {
+function ItemsWithSpecs({ items = [], specsMap = {} }) {
   if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
   return (
     <View style={styles.itemSpecList}>
       {items.map((item, idx) => {
         const spec = specsMap[item.toLowerCase()];
-        const qty = quantitiesMap[item.toLowerCase()];
         return (
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
               {item}
-              {qty != null && (
-                <ThemedText style={styles.itemSpecQty}> ({qty})</ThemedText>
-              )}
               {!!spec && (
                 <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>
               )}
@@ -350,9 +333,11 @@ const DonationList = () => {
               if (donation) {
                 const match = donation.matches?.find(m => m.status === "matched");
                 if (match) {
+                  // Get the chat and mark it as completed (not closed)
                   const chat = await getChatByMatchId(requestId);
                   if (chat) {
                     chatId = chat.id;
+                    // Mark chat as completed so it shows a friendly message
                     await markChatAsCompleted(chat.id);
                   }
                 }
@@ -416,14 +401,27 @@ const DonationList = () => {
     setMinScore(0);
   };
 
+  // Pagination calculations
   const totalPages = Math.ceil(donations.length / DONATIONS_PER_PAGE);
   const startIndex = (currentPage - 1) * DONATIONS_PER_PAGE;
   const endIndex = startIndex + DONATIONS_PER_PAGE;
   const currentDonations = donations.slice(startIndex, endIndex);
 
-  const goToPage = (pageNumber) => setCurrentPage(pageNumber);
-  const goToPreviousPage = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
-  const goToNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   if (loading) {
     return (
@@ -436,7 +434,7 @@ const DonationList = () => {
 
   return (
     <ThemedView style={styles.container}>
-      <Spacer height={90} />
+      <Spacer height={100} />
       <View style={styles.headerCard}>
         <ThemedText title style={styles.heading}>My Donations</ThemedText>
         <ThemedText style={styles.subtitle}>View your past and current donations!</ThemedText>
@@ -528,8 +526,8 @@ const DonationList = () => {
         {currentDonations.map((donation) => {
           const filteredMatches = filterAndSortMatches(donation);
 
+          // Specs for this donation (for the header card)
           const mySpecsMap = buildSpecsMap(donation);
-          const myQuantitiesMap = buildQuantitiesMap(donation);
 
           const pendingRequests = filteredMatches.filter(
             (m) => m.status === "pending" && !m.myContact
@@ -551,10 +549,10 @@ const DonationList = () => {
               <View style={styles.donationHeader}>
                 <View style={styles.donationHeaderText}>
                   <ThemedText style={styles.donationTitle}>Donation Items:</ThemedText>
+                  {/* Show items with their specs */}
                   <ItemsWithSpecs
                     items={donation.items || []}
                     specsMap={mySpecsMap}
-                    quantitiesMap={myQuantitiesMap}
                   />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(donation.location)}
@@ -591,7 +589,6 @@ const DonationList = () => {
                         <ItemsWithSpecs
                           items={match.partner?.items || []}
                           specsMap={buildSpecsMap(match.partner)}
-                          quantitiesMap={buildQuantitiesMap(match.partner)}
                         />
                         <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
                           Match Score: {match.score || 0}
@@ -660,7 +657,6 @@ const DonationList = () => {
                       <ItemsWithSpecs
                         items={match.partner?.items || []}
                         specsMap={buildSpecsMap(match.partner)}
-                        quantitiesMap={buildQuantitiesMap(match.partner)}
                       />
                       <ThemedText style={styles.subtle}>
                         School: {getSchoolDisplay(match.partner)}
@@ -699,10 +695,10 @@ const DonationList = () => {
 
                       <View style={styles.matchDetailsBox}>
                         <ThemedText style={styles.matchDetailLabel}>Matched Items:</ThemedText>
+                        {/* Show matched items with the donor's specs */}
                         <ItemsWithSpecs
                           items={match.items || []}
                           specsMap={mySpecsMap}
-                          quantitiesMap={myQuantitiesMap}
                         />
                         <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>
                           School:
@@ -738,7 +734,10 @@ const DonationList = () => {
         {totalPages > 1 && (
           <View style={styles.paginationContainer}>
             <TouchableOpacity
-              style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+              style={[
+                styles.navButton,
+                currentPage === 1 && styles.navButtonDisabled,
+              ]}
               onPress={goToPreviousPage}
               disabled={currentPage === 1}
             >
@@ -753,7 +752,10 @@ const DonationList = () => {
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                 <TouchableOpacity
                   key={pageNum}
-                  style={[styles.pageButton, currentPage === pageNum && styles.pageButtonActive]}
+                  style={[
+                    styles.pageButton,
+                    currentPage === pageNum && styles.pageButtonActive,
+                  ]}
                   onPress={() => goToPage(pageNum)}
                 >
                   <ThemedText
@@ -769,7 +771,10 @@ const DonationList = () => {
             </View>
 
             <TouchableOpacity
-              style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+              style={[
+                styles.navButton,
+                currentPage === totalPages && styles.navButtonDisabled,
+              ]}
               onPress={goToNextPage}
               disabled={currentPage === totalPages}
             >
@@ -833,7 +838,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#dee6ff",
   },
   heading: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 5,
@@ -841,7 +846,7 @@ const styles = StyleSheet.create({
   },
   headerCard: {
     backgroundColor: "#699cea",
-    paddingVertical: 18,
+    paddingVertical: 22,
     paddingHorizontal: 32,
     borderRadius: 30,
     alignSelf: "center",
@@ -853,7 +858,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: "center",
     color: "#e2f0ff",
     lineHeight: 22,
@@ -1068,6 +1073,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   hideKeyboardText: { color: "#4A90E2", fontSize: 13, fontWeight: "500" },
+  // Item + spec list styles
   itemSpecList: {
     marginTop: 4,
     gap: 2,
@@ -1081,11 +1087,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#333",
     fontWeight: "500",
-  },
-  itemSpecQty: {
-    fontSize: 13,
-    color: "#888",
-    fontWeight: "400",
   },
   itemSpecDetail: {
     fontSize: 13,
