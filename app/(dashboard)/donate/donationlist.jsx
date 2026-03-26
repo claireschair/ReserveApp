@@ -43,7 +43,11 @@ function buildSpecsMap(requestDoc) {
  * Renders each item on its own row as "ItemName - spec" (spec omitted if empty).
  * Single-word item names shrink font to stay on one line; multi-word names
  * wrap naturally.
+ * Renders each item on its own row as "ItemName - spec" (spec omitted if empty).
+ * Single-word item names shrink font to stay on one line; multi-word names
+ * wrap naturally.
  */
+function ItemsWithSpecs({ items = [], specsMap = {} }) {
 function ItemsWithSpecs({ items = [], specsMap = {} }) {
   if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
   return (
@@ -264,14 +268,17 @@ const DonationList = () => {
                 const match = donation.matches?.find(m => m.status === "matched");
                 if (match) {
                   // Get the chat and mark it as completed (not closed)
+                  // Get the chat and mark it as completed (not closed)
                   const chat = await getChatByMatchId(requestId);
                   if (chat) {
                     chatId = chat.id;
+                    // Mark chat as completed so it shows a friendly message
                     // Mark chat as completed so it shows a friendly message
                     await markChatAsCompleted(chat.id);
                   }
                 }
               }
+              
               
               await completeMatch(requestId, chatId);
               Alert.alert("Match Completed!", "Thank you!");
@@ -314,11 +321,27 @@ const DonationList = () => {
   };
 
   // Pagination calculations
+  // Pagination calculations
   const totalPages = Math.ceil(donations.length / DONATIONS_PER_PAGE);
   const startIndex = (currentPage - 1) * DONATIONS_PER_PAGE;
   const endIndex = startIndex + DONATIONS_PER_PAGE;
   const currentDonations = donations.slice(startIndex, endIndex);
 
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
   const goToPage = (pageNumber) => {
     setCurrentPage(pageNumber);
   };
@@ -439,6 +462,7 @@ const DonationList = () => {
           const filteredMatches = filterAndSortMatches(donation);
 
           // Specs for this donation (for the header card)
+          // Specs for this donation (for the header card)
           const mySpecsMap = buildSpecsMap(donation);
 
           const pendingRequests = filteredMatches.filter(
@@ -461,6 +485,7 @@ const DonationList = () => {
               <View style={styles.donationHeader}>
                 <View style={styles.donationHeaderText}>
                   <ThemedText style={styles.donationTitle}>Donation Items:</ThemedText>
+                  {/* Show items with their specs */}
                   {/* Show items with their specs */}
                   <ItemsWithSpecs
                     items={donation.items || []}
@@ -608,6 +633,7 @@ const DonationList = () => {
                       <View style={styles.matchDetailsBox}>
                         <ThemedText style={styles.matchDetailLabel}>Matched Items:</ThemedText>
                         {/* Show matched items with the donor's specs */}
+                        {/* Show matched items with the donor's specs */}
                         <ItemsWithSpecs
                           items={match.items || []}
                           specsMap={mySpecsMap}
@@ -650,6 +676,10 @@ const DonationList = () => {
                 styles.navButton,
                 currentPage === 1 && styles.navButtonDisabled,
               ]}
+              style={[
+                styles.navButton,
+                currentPage === 1 && styles.navButtonDisabled,
+              ]}
               onPress={goToPreviousPage}
               disabled={currentPage === 1}
             >
@@ -664,6 +694,10 @@ const DonationList = () => {
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                 <TouchableOpacity
                   key={pageNum}
+                  style={[
+                    styles.pageButton,
+                    currentPage === pageNum && styles.pageButtonActive,
+                  ]}
                   style={[
                     styles.pageButton,
                     currentPage === pageNum && styles.pageButtonActive,
@@ -683,6 +717,10 @@ const DonationList = () => {
             </View>
 
             <TouchableOpacity
+              style={[
+                styles.navButton,
+                currentPage === totalPages && styles.navButtonDisabled,
+              ]}
               style={[
                 styles.navButton,
                 currentPage === totalPages && styles.navButtonDisabled,
@@ -985,6 +1023,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   hideKeyboardText: { color: "#4A90E2", fontSize: 13, fontWeight: "500" },
+  // Item + spec list styles
   // Item + spec list styles
   itemSpecList: {
     marginTop: 4,
