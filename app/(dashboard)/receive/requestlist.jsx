@@ -1,6 +1,6 @@
 import { useEffect, useState, useContext } from "react";
 import { StyleSheet, ScrollView, View, TouchableOpacity, Alert, TextInput, Modal, RefreshControl, Keyboard } from "react-native";
-import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { router } from "expo-router";
 import { db } from "../../../lib/firebase";
 import { useMatch } from "../../../hooks/useMatch";
@@ -116,83 +116,14 @@ const RequestList = () => {
   useEffect(() => {
     if (!user?.uid) return;
 
-    // Track previous state to detect changes
-    const previousStates = new Map();
-
     const myRequestsQuery = query(
       collection(db, "requests"),
       where("userId", "==", user.uid),
       where("type", "==", "receive")
     );
-    
     const unsubscribeMyRequests = onSnapshot(
       myRequestsQuery,
-      async (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === "modified") {
-            const docId = change.doc.id;
-            const newData = change.doc.data();
-            const prevData = previousStates.get(docId);
-            
-            // Check if status just changed to completed and we didn't do it
-            if (
-              prevData && 
-              prevData.status !== "completed" && 
-              newData.status === "completed" &&
-              newData.completedBy && 
-              newData.completedBy !== user.uid
-            ) {
-              // Partner just completed the match
-              // Wait a moment for the auto-resubmit to be created
-              setTimeout(async () => {
-                const checkForResubmit = query(
-                  collection(db, "requests"),
-                  where("userId", "==", user.uid),
-                  where("type", "==", "receive"),
-                  where("isAutoResubmit", "==", true),
-                  where("status", "==", "active")
-                );
-                
-                const resubmitSnapshot = await getDocs(checkForResubmit);
-                const resubmits = resubmitSnapshot.docs.map(doc => ({ 
-                  id: doc.id, 
-                  ...doc.data() 
-                }));
-                
-                // Find the most recent one (within last 30 seconds)
-                const now = Date.now() / 1000;
-                const recentResubmit = resubmits.find(r => 
-                  r.createdAt?.seconds && (now - r.createdAt.seconds) < 30
-                );
-                
-                if (recentResubmit) {
-                  Alert.alert(
-                    "Match Completed! ♻️",
-                    `Your match was completed by your partner!\n\nWe automatically created a new request with your ${recentResubmit.items.length} leftover item(s). Check your requests to see new matches!`,
-                    [{ text: "OK" }]
-                  );
-                } else {
-                  Alert.alert(
-                    "Match Completed!",
-                    "Your match was completed by your partner. Thank you!",
-                    [{ text: "OK" }]
-                  );
-                }
-              }, 2000); // Wait 2 seconds for resubmit to be created
-            }
-            
-            // Update previous state
-            previousStates.set(docId, { ...newData });
-          }
-          
-          // Initialize previous state for new docs
-          if (change.type === "added") {
-            previousStates.set(change.doc.id, { ...change.doc.data() });
-          }
-        });
-        
-        loadRequests();
-      },
+      () => { loadRequests(); },
       (error) => { console.error("Error listening to my requests:", error); }
     );
 
@@ -209,7 +140,6 @@ const RequestList = () => {
     return () => {
       unsubscribeMyRequests();
       unsubscribeDonations();
-      previousStates.clear();
     };
   }, [user?.uid]);
 
@@ -377,26 +307,8 @@ const RequestList = () => {
                 }
               }
               
-              const result = await completeMatch(requestId, chatId);
-              
-              // Show appropriate message based on whether items were resubmitted
-              if (result && (result.donorResubmitted || result.requestorResubmitted)) {
-                // Determine leftover count based on user type
-                const leftoverCount = result.isDonor ? result.donorLeftoverCount : result.requestorLeftoverCount;
-                const hasLeftovers = result.isDonor ? result.donorResubmitted : result.requestorResubmitted;
-                
-                if (hasLeftovers && leftoverCount > 0) {
-                  Alert.alert(
-                    "Match Completed! ♻️",
-                    `Thank you for using our service!\n\nWe automatically created a new request with your ${leftoverCount} leftover item(s). Check your requests to see new matches!`,
-                    [{ text: "OK" }]
-                  );
-                } else {
-                  Alert.alert("Match Completed!", "Thank you for using our service!");
-                }
-              } else {
-                Alert.alert("Match Completed!", "Thank you for using our service!");
-              }
+              await completeMatch(requestId, chatId);
+              Alert.alert("Match Completed!", "Thank you for using our service!");
             } catch (err) {
               console.error(err);
               Alert.alert("Error", "Failed to complete match.");
