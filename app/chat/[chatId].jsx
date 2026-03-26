@@ -161,7 +161,7 @@ const ChatScreen = () => {
   const { user } = useContext(UserContext);
   const { subscribeToMessages, sendMessage, markMessagesAsRead, closeChat } = useChat();
   const { submitReport, hasReported } = useReport();
-  const { completeMatch } = useMatch();
+  const { completeMatch, resubmitAfterReport } = useMatch();
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
@@ -319,7 +319,12 @@ const ChatScreen = () => {
       setIClosedChat(true);
 
       if (chatId) await closeChat(chatId, 'reported');
-      if (matchId) await completeMatch(matchId);
+      
+      // Only resubmit ALL items (this handles marking as completed internally)
+      // Do NOT call completeMatch - that's for successful exchanges
+      if (matchId) {
+        await resubmitAfterReport(matchId);
+      }
 
       setReportModalVisible(false);
       setSelectedReason("");
@@ -327,7 +332,7 @@ const ChatScreen = () => {
 
       Alert.alert(
         "Report Submitted",
-        "Thank you. The chat has been closed. Our moderators will review your report.",
+        "Thank you. The chat has been closed and we've created a new request/donation with all your items so you can find a new match.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (error) {
@@ -421,7 +426,7 @@ const ChatScreen = () => {
         <View style={styles.completedBanner}>
           <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
           <View style={styles.completedTextContainer}>
-            <ThemedText style={styles.completedTitle}>Match Completed!</ThemedText>
+            <ThemedText style={styles.completedTitle}>Match Completed! 🎉</ThemedText>
             <ThemedText style={styles.completedMessage}>
               This exchange was successfully completed. Chat is now read-only.
             </ThemedText>

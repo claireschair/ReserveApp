@@ -173,12 +173,10 @@ export function MatchProvider({ children }) {
   const { user } = useContext(UserContext);
   const userId = user?.uid ?? null;
 
-  // itemSpecsObject: { [itemName]: "spec string" }
-  async function saveRequest(type, items, locationData = {}, quantitiesObject = {}, itemSpecsObject = {}) {
+  async function saveRequest(type, items, locationData = {}, quantitiesObject = {}, itemSpecsObject = {}, isAutoResubmit = false) {
     if (!userId) return null;
 
     const quantities = items.map((item) => quantitiesObject[item] || 1);
-    // Store specs as a parallel array matching items order (empty string if no spec)
     const specs = items.map((item) => itemSpecsObject[item] || "");
 
     const expiresAt = new Date();
@@ -206,11 +204,12 @@ export function MatchProvider({ children }) {
       type,
       items,
       quantities,
-      specs, // <-- stored but not used in matching
+      specs,
       location: finalLocation,
       status: "active",
       createdAt: Timestamp.now(),
       expiresAt: Timestamp.fromDate(expiresAt),
+      isAutoResubmit, // Mark if this was auto-created from leftover items
       match: {
         partnerId: null,
         partnerUserId: null,
@@ -276,14 +275,292 @@ export function MatchProvider({ children }) {
 
   async function saveDonation(items, other, locationData, quantitiesObject, itemSpecsObject = {}) {
     const allItems = [...items, ...(other || [])];
-    return saveRequest("donate", allItems, locationData, quantitiesObject, itemSpecsObject);
+    return saveRequest("donate", allItems, locationData, quantitiesObject, itemSpecsObject, false);
   }
 
   async function saveReceiveRequest(items, other, locationData, quantitiesObject, itemSpecsObject = {}) {
     const allItems = [...items, ...(other || [])];
-    return saveRequest("receive", allItems, locationData, quantitiesObject, itemSpecsObject);
+    return saveRequest("receive", allItems, locationData, quantitiesObject, itemSpecsObject, false);
   }
 
+  /**
+   * Calculate leftover items after a match completion
+   * Returns { donorLeftovers, requestorLeftovers } with items, quantities, specs
+   */
+  function calculateLeftoverItems(donorRequest, requestorRequest, matchedItems) {
+    const normalizeForComparison = (str) => str.toLowerCase().trim();
+    const matchedNormalized = matchedItems.map(normalizeForComparison);
+
+    // Helper to filter out matched items and preserve parallel arrays
+    const getLeftovers = (request) => {
+      const leftoverIndices = [];
+      
+      request.items.forEach((item, idx) => {
+        if (!matchedNormalized.includes(normalizeForComparison(item))) {
+          leftoverIndices.push(idx);
+        }
+      });
+
+      if (leftoverIndices.length === 0) return null;
+
+      return {
+        items: leftoverIndices.map(idx => request.items[idx]),
+        quantities: leftoverIndices.map(idx => request.quantities?.[idx] || 1),
+        specs: leftoverIndices.map(idx => request.specs?.[idx] || ""),
+      };
+    };
+
+    return {
+      donorLeftovers: getLeftovers(donorRequest),
+      requestorLeftovers: getLeftovers(requestorRequest),
+    };
+  }
+
+  /**
+   * Resubmit leftover items as new active requests
+   */
+  async function resubmitLeftoverItems(userId, type, leftoverData, location) {
+    if (!leftoverData || leftoverData.items.length === 0) return null;
+
+    // Build quantities and specs objects from arrays
+    const quantitiesObject = {};
+    const specsObject = {};
+    
+    leftoverData.items.forEach((item, idx) => {
+      quantitiesObject[item] = leftoverData.quantities[idx];
+      if (leftoverData.specs[idx]) {
+        specsObject[item] = leftoverData.specs[idx];
+      }
+    });
+
+    // Create new request with leftover items
+    const result = await saveRequest(
+      type,
+      leftoverData.items,
+      location,
+      quantitiesObject,
+      specsObject,
+      true // Mark as auto-resubmit
+    );
+
+    return result;
+  }
+
+  /**
+   * Resubmit all items from a request after reporting
+   * This recreates the entire form for the reporter (NOT a completion)
+   */
+  async function resubmitAfterReport(requestId) {
+    if (!userId) return null;
+
+    try {
+      const requestDoc = await getDoc(doc(db, "requests", requestId));
+      if (!requestDoc.exists()) throw new Error("Request not found.");
+
+      const request = { id: requestDoc.id, ...requestDoc.data() };
+      
+      // Only resubmit for the person who is reporting (not being reported)
+      if (request.userId !== userId) {
+        return null;
+      }
+
+      // Get partner request to close it too
+      const partnerId = request.match?.partnerId;
+
+      // Build quantities and specs objects from arrays
+      const quantitiesObject = {};
+      const specsObject = {};
+      
+      request.items.forEach((item, idx) => {
+        quantitiesObject[item] = request.quantities[idx];
+        if (request.specs[idx]) {
+          specsObject[item] = request.specs[idx];
+        }
+      });
+
+      // Create new request with ALL items (not just leftovers)
+      const result = await saveRequest(
+        request.type,
+        request.items,
+        request.location,
+        quantitiesObject,
+        specsObject,
+        false // Not an auto-resubmit
+      );
+
+      // Mark the original requests as completed (not the match itself)
+      await updateDoc(doc(db, "requests", requestId), {
+        status: "completed",
+        completedAt: Timestamp.now(),
+        closedReason: "reported",
+      });
+
+      if (partnerId) {
+        await updateDoc(doc(db, "requests", partnerId), {
+          status: "completed",
+          completedAt: Timestamp.now(),
+          closedReason: "reported_by_partner",
+        });
+      }
+
+      // Send notification
+      const pushToken = await getUserPushToken(userId);
+      if (pushToken) {
+        await sendPushNotification(
+          pushToken,
+          "Your Items Have Been Resubmitted",
+          `We've created a new ${request.type === "donate" ? "donation" : "request"} with all your items. You can find new matches!`,
+          { type: "report_resubmit" }
+        );
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Error resubmitting after report:", error);
+      throw error;
+    }
+  }
+
+  async function completeMatch(requestId, chatId = null) {
+    if (!userId) return null;
+
+    try {
+      // Get both request documents
+      const requestDoc = await getDoc(doc(db, "requests", requestId));
+      if (!requestDoc.exists()) throw new Error("Request not found.");
+
+      const request = { id: requestDoc.id, ...requestDoc.data() };
+      const partnerId = request.match?.partnerId;
+
+      if (!partnerId) {
+        // No partner, just complete the single request
+        await updateDoc(doc(db, "requests", requestId), { 
+          status: "completed",
+          completedAt: Timestamp.now(),
+          "match.chatId": chatId,
+        });
+        return true;
+      }
+
+      // Get partner request
+      const partnerDoc = await getDoc(doc(db, "requests", partnerId));
+      if (!partnerDoc.exists()) throw new Error("Partner request not found.");
+      
+      const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
+
+      // Determine which is donor and which is requestor
+      const isDonor = request.type === "donate";
+      const donorRequest = isDonor ? request : partnerRequest;
+      const requestorRequest = isDonor ? partnerRequest : request;
+
+      // Calculate matched items (these are the items that were actually exchanged)
+      const matchResult = calculateMatchScore(donorRequest, requestorRequest);
+      const matchedItems = matchResult?.overlap || [];
+
+      // Calculate leftover items
+      const { donorLeftovers, requestorLeftovers } = calculateLeftoverItems(
+        donorRequest,
+        requestorRequest,
+        matchedItems
+      );
+
+      // Mark both requests as completed
+      await updateDoc(doc(db, "requests", requestId), { 
+        status: "completed",
+        completedAt: Timestamp.now(),
+        "match.chatId": chatId,
+        completedBy: userId, // Track who completed it
+      });
+
+      await updateDoc(doc(db, "requests", partnerId), { 
+        status: "completed",
+        completedAt: Timestamp.now(),
+        "match.chatId": chatId,
+        completedBy: userId, // Track who completed it
+      });
+
+      // Resubmit leftover items for donor
+      let donorResubmitted = false;
+      if (donorLeftovers) {
+        await resubmitLeftoverItems(
+          donorRequest.userId,
+          "donate",
+          donorLeftovers,
+          donorRequest.location
+        );
+        donorResubmitted = true;
+      }
+
+      // Resubmit leftover items for requestor
+      let requestorResubmitted = false;
+      if (requestorLeftovers) {
+        await resubmitLeftoverItems(
+          requestorRequest.userId,
+          "receive",
+          requestorLeftovers,
+          requestorRequest.location
+        );
+        requestorResubmitted = true;
+      }
+
+      // Send notifications to BOTH users about completion and resubmissions
+      // Notify donor
+      const donorPushToken = await getUserPushToken(donorRequest.userId);
+      if (donorPushToken) {
+        if (donorResubmitted) {
+          await sendPushNotification(
+            donorPushToken,
+            "Match Completed! ♻️",
+            `Your match was completed. We automatically created a new donation with your ${donorLeftovers.items.length} leftover item(s).`,
+            { type: "match_completed_with_resubmit" }
+          );
+        } else {
+          await sendPushNotification(
+            donorPushToken,
+            "Match Completed!",
+            "Your match was successfully completed. Thank you for donating!",
+            { type: "match_completed" }
+          );
+        }
+      }
+
+      // Notify requestor
+      const requestorPushToken = await getUserPushToken(requestorRequest.userId);
+      if (requestorPushToken) {
+        if (requestorResubmitted) {
+          await sendPushNotification(
+            requestorPushToken,
+            "Match Completed! ♻️",
+            `Your match was completed. We automatically created a new request with your ${requestorLeftovers.items.length} leftover item(s).`,
+            { type: "match_completed_with_resubmit" }
+          );
+        } else {
+          await sendPushNotification(
+            requestorPushToken,
+            "Match Completed!",
+            "Your match was successfully completed. Thank you!",
+            { type: "match_completed" }
+          );
+        }
+      }
+
+      return {
+        completed: true,
+        donorResubmitted,
+        requestorResubmitted,
+        donorLeftoverCount: donorLeftovers?.items.length || 0,
+        requestorLeftoverCount: requestorLeftovers?.items.length || 0,
+        isDonor, // Return this so we know which type the caller is
+      };
+
+    } catch (error) {
+      console.error("Error completing match:", error);
+      throw error;
+    }
+  }
+
+  // ... rest of the functions remain the same (cleanupExpiredAndTimedOut, getRequestsWithMatches, etc.)
+  
   async function cleanupExpiredAndTimedOut() {
     try {
       const q = query(collection(db, "requests"));
@@ -430,7 +707,6 @@ export function MatchProvider({ children }) {
               status: request.status,
               myContact: request.match.myContact,
               partnerContact: partnerContact,
-              // Pass through specs from the donation side for display
               donorSpecs: buildSpecsMap(
                 type === "donate" ? request : partner
               ),
@@ -494,7 +770,6 @@ export function MatchProvider({ children }) {
     }
   }
 
-  // Helper: build a { itemName: specString } map from a request doc's items+specs arrays
   function buildSpecsMap(requestDoc) {
     const map = {};
     if (!requestDoc?.items || !requestDoc?.specs) return map;
@@ -559,7 +834,6 @@ export function MatchProvider({ children }) {
         }
       }
       
-      // Sort by completion date, newest first
       completed.sort((a, b) => {
         const aTime = a.completedAt?.seconds || 0;
         const bTime = b.completedAt?.seconds || 0;
@@ -827,32 +1101,6 @@ export function MatchProvider({ children }) {
     return true;
   }
 
-  async function completeMatch(requestId, chatId = null) {
-    if (!userId) return null;
-
-    const requestDoc = await getDoc(doc(db, "requests", requestId));
-    if (!requestDoc.exists()) throw new Error("Request not found.");
-
-    const request = requestDoc.data();
-    const partnerId = request.match?.partnerId;
-
-    await updateDoc(doc(db, "requests", requestId), { 
-      status: "completed",
-      completedAt: Timestamp.now(),
-      "match.chatId": chatId,
-    });
-
-    if (partnerId) {
-      await updateDoc(doc(db, "requests", partnerId), { 
-        status: "completed",
-        completedAt: Timestamp.now(),
-        "match.chatId": chatId,
-      });
-    }
-
-    return true;
-  }
-
   async function deleteRequest(requestId) {
     if (!userId) return null;
 
@@ -1004,6 +1252,7 @@ export function MatchProvider({ children }) {
         provideRequestorContact: provideContact,
         cleanupExpiredAndTimedOut,
         completeMatch,
+        resubmitAfterReport,
         deleteDonation: deleteRequest,
         deleteRequest,
         subscribeToRequest,
