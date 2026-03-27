@@ -20,9 +20,11 @@ const { width } = Dimensions.get('window');
 
 const Profile = () => {
   const router = useRouter(); 
-  const { logout, user, authChecked } = useUser();
+  const { logout, user, authChecked, resetPassword } = useUser();
   const [notif, setNotif] = useState(true);
   const [loadingNotif, setLoadingNotif] = useState(false);
+  const [resetSent, setResetSent] = useState(false)
+
 
   useEffect(() => {
     loadNotificationPreference();
@@ -57,6 +59,15 @@ const Profile = () => {
       setLoadingNotif(false);
     }
   };
+  const handleResetPassword = async () => {
+    try {
+      await resetPassword(user.email)
+      setResetSent(true)
+      Alert.alert('Check your email', `A password reset link was sent to ${user.email}.`)
+    } catch (err) {
+      Alert.alert('Error', "Couldn't send the reset email. Try again.")
+    }
+  }
 
   if (!authChecked) {
     return (
@@ -150,6 +161,11 @@ const Profile = () => {
             switchValue={notif}
             onSwitchChange={handleNotificationToggle}
             loading={loadingNotif} 
+          />
+          <SettingsRow
+            icon="key-outline"
+            label={resetSent ? "Reset email sent ✓" : "Reset password"}
+            onPress={handleResetPassword}
           />
           <SettingsRow
             icon="document-text-outline"

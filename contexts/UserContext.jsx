@@ -6,6 +6,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
   reload,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
@@ -110,6 +111,9 @@ export function UserProvider({ children }) {
     return { alreadyVerified: false };
   }
 
+  async function resetPassword(email) {
+    await sendPasswordResetEmail(auth, email);
+  }
   async function logout() {
     await signOut(auth);
     setUser(null);
@@ -133,7 +137,7 @@ export function UserProvider({ children }) {
   }
 
   return (
-    <UserContext.Provider value={{ user, authChecked, login, logout, register, resendVerificationEmail }}>
+    <UserContext.Provider value={{ user, authChecked, login, logout, register, resendVerificationEmail, resetPassword }}>
       {children}
     </UserContext.Provider>
   );

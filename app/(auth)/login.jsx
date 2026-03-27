@@ -14,7 +14,11 @@ const Login = () => {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState()
-  const { login } = useUser()
+  const [showForgot, setShowForgot] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetStatus, setResetStatus] = useState(null) // 'sent' | 'error' | null
+  const [resetLoading, setResetLoading] = useState(false)
+  const { login, resetPassword } = useUser()
   const router = useRouter()
 
   const handleSubmit = async () => {
@@ -22,7 +26,6 @@ const Login = () => {
     try {
       await login(email, password)
     } catch (error) {
-      // Redirect unverified users straight to the verify-email screen
       if (error.code === "auth/email-not-verified") {
         router.push({
           pathname: "/(auth)/verify-email",
@@ -31,6 +34,20 @@ const Login = () => {
         return
       }
       setError(error.message)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!resetEmail.trim()) return
+    setResetLoading(true)
+    setResetStatus(null)
+    try {
+      await resetPassword(resetEmail.trim())
+      setResetStatus('sent')
+    } catch (err) {
+      setResetStatus('error')
+    } finally {
+      setResetLoading(false)
     }
   }
 
@@ -67,6 +84,53 @@ const Login = () => {
           <ThemedButton onPress={handleSubmit} style={styles.loginButton}>
             <Text style={{ color: '#f2f2f2' }}>Login</Text>
           </ThemedButton>
+
+          {/* Forgot password toggle */}
+          <Text
+            style={styles.forgotLink}
+            onPress={() => {
+              setShowForgot(!showForgot)
+              setResetEmail(email) // pre-fill with whatever they typed
+              setResetStatus(null)
+            }}
+          >
+            Forgot password?
+          </Text>
+
+          {showForgot && (
+            <View style={styles.forgotBox}>
+              {resetStatus === 'sent' ? (
+                <Text style={styles.resetSuccess}>
+                  ✓ Reset link sent! Check your email.
+                </Text>
+              ) : (
+                <>
+                  <ThemedTextInput
+                    style={[styles.input, { marginBottom: 10 }]}
+                    placeholder="Enter your email"
+                    value={resetEmail}
+                    onChangeText={setResetEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  {resetStatus === 'error' && (
+                    <Text style={styles.resetError}>
+                      Couldn't send reset email. Check the address and try again.
+                    </Text>
+                  )}
+                  <ThemedButton
+                    onPress={handleResetPassword}
+                    style={styles.resetButton}
+                    disabled={resetLoading}
+                  >
+                    <Text style={{ color: '#f2f2f2', fontSize: 13 }}>
+                      {resetLoading ? 'Sending...' : 'Send reset link'}
+                    </Text>
+                  </ThemedButton>
+                </>
+              )}
+            </View>
+          )}
 
           <Spacer />
           {error && <Text style={styles.error}>{error}</Text>}
@@ -143,5 +207,40 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingVertical: 14,
     alignItems: "center",
+  },
+  forgotLink: {
+    marginTop: 14,
+    color: "#4A90E2",
+    fontSize: 13,
+    textDecorationLine: "underline",
+  },
+  forgotBox: {
+    width: "90%",
+    marginTop: 12,
+    alignItems: "center",
+    backgroundColor: "#F3F6FB",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e0e7ff",
+  },
+  resetButton: {
+    backgroundColor: "#4A90E2",
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  resetSuccess: {
+    color: "#2e7d32",
+    fontSize: 13,
+    textAlign: "center",
+    paddingVertical: 4,
+  },
+  resetError: {
+    color: Colors.warning,
+    fontSize: 12,
+    textAlign: "center",
+    marginBottom: 8,
   },
 })
