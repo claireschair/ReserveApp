@@ -1,6 +1,7 @@
 import { StyleSheet, View, Image, Dimensions, Text, TouchableOpacity, ActivityIndicator, Alert, Switch, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import { Modal, TextInput } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { 
   updateNotificationPreference, 
@@ -20,10 +21,14 @@ const { width } = Dimensions.get('window');
 
 const Profile = () => {
   const router = useRouter(); 
-  const { logout, user, authChecked, resetPassword } = useUser();
+  const { logout, user, authChecked, resetPassword, deleteAccount } = useUser();
   const [notif, setNotif] = useState(true);
   const [loadingNotif, setLoadingNotif] = useState(false);
-  const [resetSent, setResetSent] = useState(false)
+  const [resetSent, setResetSent] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
 
   useEffect(() => {
@@ -68,6 +73,36 @@ const Profile = () => {
       Alert.alert('Error', "Couldn't send the reset email. Try again.")
     }
   }
+    const confirmDelete = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all your data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', style: 'destructive', onPress: () => setShowDeleteModal(true) },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword.trim()) {
+      setDeleteError('Please enter your password.');
+      return;
+    }
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await deleteAccount(deletePassword);
+      // UserContext clears user state — navigation handles the rest
+    } catch (err) {
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setDeleteError('Incorrect password. Please try again.');
+      } else {
+        setDeleteError('Something went wrong. Please try again.');
+      }
+      setDeleteLoading(false);
+    }
+  };
 
   if (!authChecked) {
     return (
@@ -199,9 +234,76 @@ const Profile = () => {
             isDestructive
             onPress={logout}
           />
+          <SettingsRow
+            icon="trash-outline"
+            label="Delete Account"
+            isDestructive
+            onPress={confirmDelete}
+          />
         </View>
+        
       </View>
       <Spacer height={100} />
+      {/* Delete Account Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="warning-outline" size={32} color="#d9534f" />
+            </View>
+
+            <Text style={styles.modalTitle}>Confirm Deletion</Text>
+            <Text style={styles.modalSubtitle}>
+              Enter your password to permanently delete your account and all associated data.
+            </Text>
+
+            <TextInput
+              style={[styles.modalInput, deleteError ? styles.modalInputError : null]}
+              placeholder="Your password"
+              placeholderTextColor="#aaa"
+              secureTextEntry
+              value={deletePassword}
+              onChangeText={(t) => { setDeletePassword(t); setDeleteError(''); }}
+              autoCapitalize="none"
+            />
+
+            {deleteError ? (
+              <Text style={styles.modalError}>{deleteError}</Text>
+            ) : null}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setDeletePassword('');
+                  setDeleteError('');
+                }}
+                disabled={deleteLoading}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalDeleteBtn, deleteLoading && { opacity: 0.6 }]}
+                onPress={handleDeleteAccount}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalDeleteText}>Delete forever</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -449,4 +551,98 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
   },
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 24,
+},
+modalCard: {
+  backgroundColor: '#fff',
+  borderRadius: 20,
+  padding: 24,
+  width: '100%',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOpacity: 0.15,
+  shadowRadius: 20,
+  elevation: 10,
+},
+modalIconWrap: {
+  width: 60,
+  height: 60,
+  borderRadius: 30,
+  backgroundColor: '#fff0f0',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 16,
+},
+modalTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#1f2937',
+  marginBottom: 8,
+  textAlign: 'center',
+},
+modalSubtitle: {
+  fontSize: 14,
+  color: '#666',
+  textAlign: 'center',
+  marginBottom: 20,
+  lineHeight: 20,
+},
+modalInput: {
+  width: '100%',
+  backgroundColor: '#F3F6FB',
+  paddingVertical: 13,
+  paddingHorizontal: 16,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: '#e0e7ff',
+  fontSize: 15,
+  color: '#1f2937',
+  marginBottom: 8,
+},
+modalInputError: {
+  borderColor: '#d9534f',
+  backgroundColor: '#fff5f5',
+},
+modalError: {
+  color: '#d9534f',
+  fontSize: 12,
+  marginBottom: 12,
+  alignSelf: 'flex-start',
+},
+modalButtons: {
+  flexDirection: 'row',
+  gap: 12,
+  marginTop: 8,
+  width: '100%',
+},
+modalCancelBtn: {
+  flex: 1,
+  paddingVertical: 13,
+  borderRadius: 14,
+  borderWidth: 1.5,
+  borderColor: '#e0e7ff',
+  alignItems: 'center',
+},
+modalCancelText: {
+  color: '#555',
+  fontWeight: '600',
+  fontSize: 15,
+},
+modalDeleteBtn: {
+  flex: 1,
+  paddingVertical: 13,
+  borderRadius: 14,
+  backgroundColor: '#d9534f',
+  alignItems: 'center',
+},
+modalDeleteText: {
+  color: '#fff',
+  fontWeight: '600',
+  fontSize: 15,
+},
 });
