@@ -28,14 +28,26 @@ export function ChatProvider({ children }) {
         collection(db, "chats"),
         where("matchId", "==", matchId)
       );
-      
+
       const snapshot = await getDocs(chatsQuery);
-      
+
       if (!snapshot.empty) {
         const chatDoc = snapshot.docs[0];
-        return { id: chatDoc.id, ...chatDoc.data() };
+        const existingData = chatDoc.data();
+
+        // If this user's email isn't in the map yet, write it.
+        // The security rule allows updating participantEmails in isolation,
+        // so we send only that field in the update.
+        if (!existingData.participantEmails?.[userId]) {
+          await updateDoc(doc(db, "chats", chatDoc.id), {
+            [`participantEmails.${userId}`]: contactInfo.myEmail,
+          });
+        }
+
+        return { id: chatDoc.id, ...existingData };
       }
 
+      // First opener creates the chat
       const chatData = {
         matchId,
         participants: [userId, partnerId].sort(),
@@ -52,7 +64,6 @@ export function ChatProvider({ children }) {
       };
 
       const chatRef = await addDoc(collection(db, "chats"), chatData);
-      
       return { id: chatRef.id, ...chatData };
     } catch (error) {
       console.error("Error creating chat:", error);
@@ -96,7 +107,7 @@ export function ChatProvider({ children }) {
       );
 
       const snapshot = await getDocs(messagesQuery);
-      
+
       const updatePromises = snapshot.docs.map((messageDoc) =>
         updateDoc(doc(db, "chats", chatId, "messages", messageDoc.id), {
           read: true,
@@ -125,7 +136,7 @@ export function ChatProvider({ children }) {
     }
   }
 
-  async function closeChat(chatId, reason = 'completed') {
+  async function closeChat(chatId, reason = "completed") {
     if (!userId) return;
 
     try {
@@ -175,11 +186,11 @@ export function ChatProvider({ children }) {
         collection(db, "chats"),
         where("matchId", "==", matchId)
       );
-      
+
       const snapshot = await getDocs(chatsQuery);
-      
+
       if (snapshot.empty) return null;
-      
+
       const chatDoc = snapshot.docs[0];
       return { id: chatDoc.id, ...chatDoc.data() };
     } catch (error) {

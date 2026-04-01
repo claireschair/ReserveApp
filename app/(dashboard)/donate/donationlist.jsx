@@ -1,5 +1,15 @@
 import { useEffect, useState, useContext } from "react";
-import { StyleSheet, ScrollView, View, TouchableOpacity, Alert, TextInput, Modal, RefreshControl, Keyboard } from "react-native";
+import {
+  StyleSheet,
+  ScrollView,
+  View,
+  TouchableOpacity,
+  Alert,
+  TextInput,
+  Modal,
+  RefreshControl,
+  Keyboard,
+} from "react-native";
 import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { router } from "expo-router";
 import { db } from "../../../lib/firebase";
@@ -9,6 +19,7 @@ import { UserContext } from "../../../contexts/UserContext";
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
+import MatchCompletionModal from "../../../components/MatchCompletionModal";
 import { Ionicons } from "@expo/vector-icons";
 
 const DONATIONS_PER_PAGE = 5;
@@ -25,10 +36,6 @@ function getSchoolDisplay(userData) {
   return userData.school.schoolName || "Unknown school";
 }
 
-/**
- * Build a { itemNameLower: specString } map from a request doc's
- * parallel items[] and specs[] arrays.
- */
 function buildSpecsMap(requestDoc) {
   const map = {};
   if (!requestDoc?.items || !requestDoc?.specs) return map;
@@ -39,11 +46,6 @@ function buildSpecsMap(requestDoc) {
   return map;
 }
 
-/**
- * Renders each item on its own row as "ItemName - spec" (spec omitted if empty).
- * Single-word item names shrink font to stay on one line; multi-word names
- * wrap naturally.
- */
 function ItemsWithSpecs({ items = [], specsMap = {} }) {
   if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
   return (
@@ -54,9 +56,7 @@ function ItemsWithSpecs({ items = [], specsMap = {} }) {
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
               {item}
-              {!!spec && (
-                <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>
-              )}
+              {!!spec && <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>}
             </ThemedText>
           </View>
         );
@@ -72,14 +72,8 @@ const SORT_LABELS = {
 };
 
 const DonationList = () => {
-  const {
-    getDonationsWithMatches,
-    approveDonation,
-    denyDonation,
-    completeMatch,
-    deleteDonation,
-  } = useMatch();
-
+  const { getDonationsWithMatches, approveDonation, denyDonation, completeMatch, deleteDonation } =
+    useMatch();
   const { getOrCreateChat, getChatByMatchId, markChatAsCompleted } = useChat();
   const { user } = useContext(UserContext);
 
@@ -97,6 +91,9 @@ const DonationList = () => {
   const [searchFocused, setSearchFocused] = useState(false);
   const [showAllPending, setShowAllPending] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [completionModalVisible, setCompletionModalVisible] = useState(false);
+  const [completionTargetId, setCompletionTargetId] = useState(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
 
   const loadDonations = async () => {
     try {
@@ -123,7 +120,6 @@ const DonationList = () => {
   useEffect(() => {
     if (!user?.uid) return;
 
-    // Track previous state to detect changes
     const previousStates = new Map();
 
     const myDonationsQuery = query(
@@ -131,7 +127,7 @@ const DonationList = () => {
       where("userId", "==", user.uid),
       where("type", "==", "donate")
     );
-    
+
     const unsubscribeMyDonations = onSnapshot(
       myDonationsQuery,
       async (snapshot) => {
@@ -140,17 +136,14 @@ const DonationList = () => {
             const docId = change.doc.id;
             const newData = change.doc.data();
             const prevData = previousStates.get(docId);
-            
-            // Check if status just changed to completed and we didn't do it
+
             if (
-              prevData && 
-              prevData.status !== "completed" && 
+              prevData &&
+              prevData.status !== "completed" &&
               newData.status === "completed" &&
-              newData.completedBy && 
+              newData.completedBy &&
               newData.completedBy !== user.uid
             ) {
-              // Partner just completed the match
-              // Wait a moment for the auto-resubmit to be created
               setTimeout(async () => {
                 const checkForResubmit = query(
                   collection(db, "requests"),
@@ -159,45 +152,32 @@ const DonationList = () => {
                   where("isAutoResubmit", "==", true),
                   where("status", "==", "active")
                 );
-                
                 const resubmitSnapshot = await getDocs(checkForResubmit);
-                const resubmits = resubmitSnapshot.docs.map(doc => ({ 
-                  id: doc.id, 
-                  ...doc.data() 
-                }));
-                
-                // Find the most recent one (within last 30 seconds)
+                const resubmits = resubmitSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
                 const now = Date.now() / 1000;
-                const recentResubmit = resubmits.find(r => 
-                  r.createdAt?.seconds && (now - r.createdAt.seconds) < 30
+                const recentResubmit = resubmits.find(
+                  (r) => r.createdAt?.seconds && now - r.createdAt.seconds < 30
                 );
-                
                 if (recentResubmit) {
                   Alert.alert(
-                    "Match Completed! ♻️",
-                    `Your match was completed by your partner!\n\nWe automatically created a new donation with your ${recentResubmit.items.length} leftover item(s). Check your donations to see new match requests!`,
+                    "Match Closed",
+                    `Your match was closed by your partner. A new donation was created with your ${recentResubmit.items.length} remaining item(s).`,
                     [{ text: "OK" }]
                   );
                 } else {
-                  Alert.alert(
-                    "Match Completed!",
-                    "Your match was completed by your partner. Thank you!",
-                    [{ text: "OK" }]
-                  );
+                  Alert.alert("Match Closed", "Your match was closed by your partner.", [{ text: "OK" }]);
                 }
-              }, 2000); // Wait 2 seconds for resubmit to be created
+              }, 2000);
             }
-            
-            // Update previous state
+
             previousStates.set(docId, { ...newData });
           }
-          
-          // Initialize previous state for new docs
+
           if (change.type === "added") {
             previousStates.set(change.doc.id, { ...change.doc.data() });
           }
         });
-        
+
         loadDonations();
       },
       (error) => { console.error("Error listening to my donations:", error); }
@@ -229,7 +209,7 @@ const DonationList = () => {
         const requestItems = m.partner?.items || [];
         const partnerSchool = m.partner?.school?.schoolName?.toLowerCase() || "";
         return (
-          requestItems.some(item => item.toLowerCase().includes(search)) ||
+          requestItems.some((item) => item.toLowerCase().includes(search)) ||
           partnerSchool.includes(search)
         );
       });
@@ -282,13 +262,13 @@ const DonationList = () => {
       Alert.alert("Error", "Email address is required.");
       return;
     }
-    if (!contactEmail.includes('@')) {
+    if (!contactEmail.includes("@")) {
       Alert.alert("Error", "Please provide a valid email address.");
       return;
     }
     try {
       await approveDonation(currentRequestId, { email: contactEmail });
-      Alert.alert("Match approved!", "The requestor will provide their contact info next.");
+      Alert.alert("Match approved", "The requestor will provide their contact info next.");
       setContactModalVisible(false);
       setContactEmail("");
       setCurrentRequestId(null);
@@ -300,100 +280,92 @@ const DonationList = () => {
 
   const handleOpenChat = async (donationId, match) => {
     try {
-      const chat = await getOrCreateChat(
-        donationId,
-        match.partner.userId,
-        {
-          myEmail: match.myContact.email,
-          partnerEmail: match.partnerContact.email,
-        }
-      );
-      router.push({
-        pathname: "/chat/[chatId]",
-        params: { chatId: chat.id, matchId: donationId },
+      const chat = await getOrCreateChat(donationId, match.partner.userId, {
+        myEmail: match.myContact.email,
+        partnerEmail: match.partnerContact.email,
       });
+      router.push({ pathname: "/chat/[chatId]", params: { chatId: chat.id, matchId: donationId } });
     } catch (error) {
       Alert.alert("Error", "Failed to open chat");
       console.error("Chat error:", error);
     }
   };
 
-  const handleDismissMatch = async (requestId) => {
-    Alert.alert(
-      "Complete Match",
-      "Mark as completed after successfully exchanging items.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Complete",
-          onPress: async () => {
-            try {
-              let chatId = null;
-              const donation = donations.find(d => d.id === requestId);
-              if (donation) {
-                const match = donation.matches?.find(m => m.status === "matched");
-                if (match) {
-                  // Get the chat and mark it as completed (not closed)
-                  const chat = await getChatByMatchId(requestId);
-                  if (chat) {
-                    chatId = chat.id;
-                    // Mark chat as completed so it shows a friendly message
-                    await markChatAsCompleted(chat.id);
-                  }
-                }
-              }
-              
-              const result = await completeMatch(requestId, chatId);
-              
-              // Show appropriate message based on whether items were resubmitted
-              if (result && (result.donorResubmitted || result.requestorResubmitted)) {
-                // Determine leftover count based on user type
-                const leftoverCount = result.isDonor ? result.donorLeftoverCount : result.requestorLeftoverCount;
-                const hasLeftovers = result.isDonor ? result.donorResubmitted : result.requestorResubmitted;
-                
-                if (hasLeftovers && leftoverCount > 0) {
-                  Alert.alert(
-                    "Match Completed! ♻️",
-                    `Thank you!\n\nWe automatically created a new donation with your ${leftoverCount} leftover item(s). Check your donations to see new match requests!`,
-                    [{ text: "OK" }]
-                  );
-                } else {
-                  Alert.alert("Match Completed!", "Thank you!");
-                }
-              } else {
-                Alert.alert("Match Completed!", "Thank you!");
-              }
-            } catch (err) {
-              console.error(err);
-              Alert.alert("Error", "Failed to complete match.");
-            }
-          },
-        },
-      ]
-    );
+  const handleOpenCompletionModal = (donationId) => {
+    setCompletionTargetId(donationId);
+    setCompletionModalVisible(true);
+  };
+
+  const handleConfirmCompletion = async (completionType) => {
+    setCompletionLoading(true);
+    try {
+      let chatId = null;
+      const donation = donations.find((d) => d.id === completionTargetId);
+      if (donation) {
+        const match = donation.matches?.find((m) => m.status === "matched");
+        if (match) {
+          const chat = await getChatByMatchId(completionTargetId);
+          if (chat) {
+            chatId = chat.id;
+            await markChatAsCompleted(chat.id);
+          }
+        }
+      }
+
+      const result = await completeMatch(completionTargetId, chatId, completionType);
+
+      setCompletionModalVisible(false);
+      setCompletionTargetId(null);
+
+      if (completionType === "complete") {
+        if (result?.donorResubmitted && result.donorLeftoverCount > 0) {
+          Alert.alert(
+            "Match Completed",
+            `Your match is complete. A new donation was created with your ${result.donorLeftoverCount} remaining item(s).`
+          );
+        } else {
+          Alert.alert("Match Completed", "Your match was successfully completed.");
+        }
+      } else if (completionType === "partial") {
+        if (result?.donorResubmitted && result.donorLeftoverCount > 0) {
+          Alert.alert(
+            "Partial Exchange Recorded",
+            `Match closed. A new donation was created with your ${result.donorLeftoverCount} unexchanged item(s).`
+          );
+        } else {
+          Alert.alert("Partial Exchange Recorded", "Match closed.");
+        }
+      } else if (completionType === "nocoordination") {
+        Alert.alert(
+          "Match Closed",
+          "Could not coordinate. A new donation was created with all your items so you can find a new match."
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Failed to close match.");
+    } finally {
+      setCompletionLoading(false);
+    }
   };
 
   const handleDeleteDonation = async (requestId) => {
-    Alert.alert(
-      "Delete Donation",
-      "Are you sure? This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDonation(requestId);
-              Alert.alert("Donation deleted");
-            } catch (err) {
-              console.error(err);
-              Alert.alert("Error", "Failed to delete.");
-            }
-          },
+    Alert.alert("Delete Donation", "Are you sure? This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteDonation(requestId);
+            Alert.alert("Donation deleted");
+          } catch (err) {
+            console.error(err);
+            Alert.alert("Error", "Failed to delete.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const clearFilters = () => {
@@ -401,27 +373,9 @@ const DonationList = () => {
     setMinScore(0);
   };
 
-  // Pagination calculations
   const totalPages = Math.ceil(donations.length / DONATIONS_PER_PAGE);
   const startIndex = (currentPage - 1) * DONATIONS_PER_PAGE;
-  const endIndex = startIndex + DONATIONS_PER_PAGE;
-  const currentDonations = donations.slice(startIndex, endIndex);
-
-  const goToPage = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
+  const currentDonations = donations.slice(startIndex, startIndex + DONATIONS_PER_PAGE);
 
   if (loading) {
     return (
@@ -450,13 +404,8 @@ const DonationList = () => {
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
         />
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilters(!showFilters)}
-        >
-          <ThemedText style={styles.filterButtonText}>
-            {showFilters ? "Hide" : "Filter"}
-          </ThemedText>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(!showFilters)}>
+          <ThemedText style={styles.filterButtonText}>{showFilters ? "Hide" : "Filter"}</ThemedText>
         </TouchableOpacity>
       </View>
 
@@ -489,10 +438,7 @@ const DonationList = () => {
       )}
 
       <View style={styles.dropdownWrapper}>
-        <TouchableOpacity
-          style={styles.dropdownButton}
-          onPress={() => setDropdownOpen(!dropdownOpen)}
-        >
+        <TouchableOpacity style={styles.dropdownButton} onPress={() => setDropdownOpen(!dropdownOpen)}>
           <ThemedText>Sort by: {SORT_LABELS[sortMode]} ▼</ThemedText>
         </TouchableOpacity>
         {dropdownOpen && (
@@ -503,9 +449,7 @@ const DonationList = () => {
                 style={styles.dropdownItem}
                 onPress={() => { setSortMode(key); setDropdownOpen(false); }}
               >
-                <ThemedText style={sortMode === key && styles.dropdownActiveText}>
-                  {label}
-                </ThemedText>
+                <ThemedText style={sortMode === key && styles.dropdownActiveText}>{label}</ThemedText>
               </TouchableOpacity>
             ))}
           </View>
@@ -514,46 +458,30 @@ const DonationList = () => {
 
       <Spacer height={10} />
 
-      <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {donations.length === 0 && (
-          <ThemedText style={styles.noMatch}>
-            No donations yet. Create one to help others!
-          </ThemedText>
+          <ThemedText style={styles.noMatch}>No donations yet. Create one to help others!</ThemedText>
         )}
 
         {currentDonations.map((donation) => {
           const filteredMatches = filterAndSortMatches(donation);
-
-          // Specs for this donation (for the header card)
           const mySpecsMap = buildSpecsMap(donation);
 
-          const pendingRequests = filteredMatches.filter(
-            (m) => m.status === "pending" && !m.myContact
-          );
+          const pendingRequests = filteredMatches.filter((m) => m.status === "pending" && !m.myContact);
           const waitingForRequestor = filteredMatches.filter(
             (m) => m.status === "pending" && m.myContact && !m.partnerContact
           );
-          const completedMatches = filteredMatches.filter(
-            (m) => m.status === "matched" && m.partnerContact
-          );
+          const completedMatches = filteredMatches.filter((m) => m.status === "matched" && m.partnerContact);
 
           const hasAnyMatch =
-            pendingRequests.length > 0 ||
-            waitingForRequestor.length > 0 ||
-            completedMatches.length > 0;
+            pendingRequests.length > 0 || waitingForRequestor.length > 0 || completedMatches.length > 0;
 
           return (
             <View key={donation.id} style={styles.donationCard}>
               <View style={styles.donationHeader}>
                 <View style={styles.donationHeaderText}>
                   <ThemedText style={styles.donationTitle}>Donation Items:</ThemedText>
-                  {/* Show items with their specs */}
-                  <ItemsWithSpecs
-                    items={donation.items || []}
-                    specsMap={mySpecsMap}
-                  />
+                  <ItemsWithSpecs items={donation.items || []} specsMap={mySpecsMap} />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(donation.location)}
                   </ThemedText>
@@ -563,14 +491,13 @@ const DonationList = () => {
                     style={styles.deleteIconButton}
                     onPress={() => handleDeleteDonation(donation.id)}
                   >
-                    <ThemedText style={styles.deleteIconText}>×</ThemedText>
+                    <ThemedText style={styles.deleteIconText}>x</ThemedText>
                   </TouchableOpacity>
                 )}
               </View>
 
               <Spacer height={10} />
 
-              {/* Pending requests */}
               {pendingRequests.length > 0 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
@@ -593,9 +520,7 @@ const DonationList = () => {
                         <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
                           Match Score: {match.score || 0}
                         </ThemedText>
-                        <ThemedText style={styles.subtle}>
-                          School: {getSchoolDisplay(match.partner)}
-                        </ThemedText>
+                        <ThemedText style={styles.subtle}>School: {getSchoolDisplay(match.partner)}</ThemedText>
                         <View style={styles.buttonRow}>
                           <TouchableOpacity
                             style={[styles.actionButton, styles.approveButton]}
@@ -616,10 +541,7 @@ const DonationList = () => {
                     <TouchableOpacity
                       style={styles.showMoreButton}
                       onPress={() =>
-                        setShowAllPending(prev => ({
-                          ...prev,
-                          [donation.id]: !prev[donation.id],
-                        }))
+                        setShowAllPending((prev) => ({ ...prev, [donation.id]: !prev[donation.id] }))
                       }
                     >
                       <ThemedText style={styles.showMoreText}>
@@ -637,7 +559,6 @@ const DonationList = () => {
                 </>
               )}
 
-              {/* Waiting for requestor */}
               {waitingForRequestor.length > 0 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
@@ -658,31 +579,20 @@ const DonationList = () => {
                         items={match.partner?.items || []}
                         specsMap={buildSpecsMap(match.partner)}
                       />
-                      <ThemedText style={styles.subtle}>
-                        School: {getSchoolDisplay(match.partner)}
-                      </ThemedText>
+                      <ThemedText style={styles.subtle}>School: {getSchoolDisplay(match.partner)}</ThemedText>
                     </View>
                   ))}
                 </>
               )}
 
-              {/* Completed matches */}
               {completedMatches.length > 0 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
-                    Completed Matches ({completedMatches.length}):
+                    Active Matches ({completedMatches.length}):
                   </ThemedText>
                   {completedMatches.map((match) => (
                     <View key={match.id} style={styles.contactCard}>
-                      <View style={styles.contactHeader}>
-                        <ThemedText style={styles.completeTitle}>Match Complete!</ThemedText>
-                        <TouchableOpacity
-                          style={styles.dismissButton}
-                          onPress={() => handleDismissMatch(donation.id)}
-                        >
-                          <ThemedText style={styles.dismissButtonText}>✕</ThemedText>
-                        </TouchableOpacity>
-                      </View>
+                      <ThemedText style={styles.completeTitle}>Match Ready</ThemedText>
 
                       <View style={styles.contactInfoBox}>
                         <ThemedText style={styles.sectionTitle}>Requestor Contact:</ThemedText>
@@ -695,29 +605,28 @@ const DonationList = () => {
 
                       <View style={styles.matchDetailsBox}>
                         <ThemedText style={styles.matchDetailLabel}>Matched Items:</ThemedText>
-                        {/* Show matched items with the donor's specs */}
-                        <ItemsWithSpecs
-                          items={match.items || []}
-                          specsMap={mySpecsMap}
-                        />
-                        <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>
-                          School:
-                        </ThemedText>
-                        <ThemedText style={styles.matchDetailText}>
-                          {getSchoolDisplay(match.partner)}
-                        </ThemedText>
+                        <ItemsWithSpecs items={match.items || []} specsMap={mySpecsMap} />
+                        <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>School:</ThemedText>
+                        <ThemedText style={styles.matchDetailText}>{getSchoolDisplay(match.partner)}</ThemedText>
                       </View>
 
                       <TouchableOpacity
                         style={styles.chatButton}
                         onPress={() => handleOpenChat(donation.id, match)}
                       >
-                        <ThemedText style={styles.chatButtonText}>💬 Open Chat</ThemedText>
+                        <ThemedText style={styles.chatButtonText}>Open Chat</ThemedText>
                       </TouchableOpacity>
 
                       <ThemedText style={styles.instructionText}>
-                        Use chat to coordinate pickup/delivery. Tap X when complete.
+                        Use chat to coordinate pickup or delivery.
                       </ThemedText>
+
+                      <TouchableOpacity
+                        style={styles.closeMatchButton}
+                        onPress={() => handleOpenCompletionModal(donation.id)}
+                      >
+                        <ThemedText style={styles.closeMatchButtonText}>Close Match</ThemedText>
+                      </TouchableOpacity>
                     </View>
                   ))}
                 </>
@@ -730,39 +639,25 @@ const DonationList = () => {
           );
         })}
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
           <View style={styles.paginationContainer}>
             <TouchableOpacity
-              style={[
-                styles.navButton,
-                currentPage === 1 && styles.navButtonDisabled,
-              ]}
-              onPress={goToPreviousPage}
+              style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+              onPress={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
               disabled={currentPage === 1}
             >
-              <Ionicons
-                name="chevron-back"
-                size={20}
-                color={currentPage === 1 ? "#ccc" : "#4A90E2"}
-              />
+              <Ionicons name="chevron-back" size={20} color={currentPage === 1 ? "#ccc" : "#4A90E2"} />
             </TouchableOpacity>
 
             <View style={styles.pageNumbersContainer}>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                 <TouchableOpacity
                   key={pageNum}
-                  style={[
-                    styles.pageButton,
-                    currentPage === pageNum && styles.pageButtonActive,
-                  ]}
-                  onPress={() => goToPage(pageNum)}
+                  style={[styles.pageButton, currentPage === pageNum && styles.pageButtonActive]}
+                  onPress={() => setCurrentPage(pageNum)}
                 >
                   <ThemedText
-                    style={[
-                      styles.pageButtonText,
-                      currentPage === pageNum && styles.pageButtonTextActive,
-                    ]}
+                    style={[styles.pageButtonText, currentPage === pageNum && styles.pageButtonTextActive]}
                   >
                     {pageNum}
                   </ThemedText>
@@ -771,11 +666,8 @@ const DonationList = () => {
             </View>
 
             <TouchableOpacity
-              style={[
-                styles.navButton,
-                currentPage === totalPages && styles.navButtonDisabled,
-              ]}
-              onPress={goToNextPage}
+              style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+              onPress={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
               <Ionicons
@@ -788,7 +680,7 @@ const DonationList = () => {
         )}
       </ScrollView>
 
-      <Modal visible={contactModalVisible} animationType="slide" transparent={true}>
+      <Modal visible={contactModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <ThemedText title style={{ marginBottom: 10 }}>Approve Match</ThemedText>
@@ -812,7 +704,10 @@ const DonationList = () => {
                 <ThemedText style={styles.buttonText}>Submit</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, { flex: 1, marginLeft: 5, backgroundColor: "#f0f0f0", borderColor: "#ccc" }]}
+                style={[
+                  styles.actionButton,
+                  { flex: 1, marginLeft: 5, backgroundColor: "#f0f0f0", borderColor: "#ccc" },
+                ]}
                 onPress={() => {
                   setContactModalVisible(false);
                   setContactEmail("");
@@ -825,6 +720,16 @@ const DonationList = () => {
           </View>
         </View>
       </Modal>
+
+      <MatchCompletionModal
+        visible={completionModalVisible}
+        onClose={() => {
+          setCompletionModalVisible(false);
+          setCompletionTargetId(null);
+        }}
+        onConfirm={handleConfirmCompletion}
+        loading={completionLoading}
+      />
     </ThemedView>
   );
 };
@@ -832,18 +737,8 @@ const DonationList = () => {
 export default DonationList;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: "#dee6ff",
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 5,
-    color: "white",
-  },
+  container: { flex: 1, padding: 16, backgroundColor: "#dee6ff" },
+  heading: { fontSize: 28, fontWeight: "bold", textAlign: "center", marginBottom: 5, color: "white" },
   headerCard: {
     backgroundColor: "#699cea",
     paddingVertical: 22,
@@ -857,18 +752,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
-  subtitle: {
-    fontSize: 15,
-    textAlign: "center",
-    color: "#e2f0ff",
-    lineHeight: 22,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-    gap: 8,
-  },
+  subtitle: { fontSize: 15, textAlign: "center", color: "#e2f0ff", lineHeight: 22 },
+  searchContainer: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
   searchInput: {
     flex: 1,
     backgroundColor: "white",
@@ -879,19 +764,9 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     color: "#000",
   },
-  filterButton: {
-    backgroundColor: "#4A90E2",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
+  filterButton: { backgroundColor: "#4A90E2", paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
   filterButtonText: { color: "white", fontWeight: "bold" },
-  filtersContainer: {
-    backgroundColor: "white",
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 12,
-  },
+  filtersContainer: { backgroundColor: "white", padding: 14, borderRadius: 14, marginBottom: 12 },
   filterRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   filterLabel: { fontSize: 14, marginRight: 10, width: 80 },
   filterInput: {
@@ -949,18 +824,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  deleteIconText: { color: "white", fontSize: 24, fontWeight: "bold", marginTop: -2 },
+  deleteIconText: { color: "white", fontSize: 18, fontWeight: "bold" },
   sectionTitle: { fontWeight: "bold", fontSize: 14, marginTop: 12, marginBottom: 8 },
   noMatch: { color: "#777", fontStyle: "italic", marginTop: 8 },
-  matchCard: {
-    backgroundColor: "#f8fbff",
-    padding: 14,
-    borderRadius: 14,
-    marginTop: 10,
-  },
+  matchCard: { backgroundColor: "#f8fbff", padding: 14, borderRadius: 14, marginTop: 10 },
   pendingTitle: { fontWeight: "bold", fontSize: 16, color: "#FF9800" },
   approvedTitle: { fontWeight: "bold", fontSize: 16, color: "#4CAF50" },
-  completeTitle: { fontWeight: "bold", fontSize: 16, color: "#2196F3" },
+  completeTitle: { fontWeight: "bold", fontSize: 16, color: "#2196F3", marginBottom: 12 },
   contactCard: {
     backgroundColor: "#f0f7ff",
     padding: 16,
@@ -969,21 +839,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#4A90E2",
   },
-  contactHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  dismissButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#FF6B6B",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  dismissButtonText: { color: "white", fontSize: 20, fontWeight: "bold" },
   contactInfoBox: { backgroundColor: "white", padding: 12, borderRadius: 8, marginBottom: 8 },
   contactDetail: { fontSize: 15, color: "#333", marginTop: 6, fontWeight: "500" },
   matchDetailsBox: { backgroundColor: "#ffffff", padding: 10, borderRadius: 8, marginBottom: 8 },
@@ -1003,22 +858,21 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   chatButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  closeMatchButton: {
+    backgroundColor: "white",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+    borderWidth: 1.5,
+    borderColor: "#ccc",
+  },
+  closeMatchButtonText: { color: "#555", fontSize: 15, fontWeight: "500" },
   instructionText: { fontSize: 13, color: "#555", fontStyle: "italic", marginTop: 8 },
   infoText: { fontSize: 13, color: "#555", marginTop: 4, fontStyle: "italic" },
   subtle: { fontSize: 12, color: "#666", marginTop: 2 },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: "center",
-  },
+  buttonRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 10, gap: 8 },
+  actionButton: { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1, alignItems: "center" },
   approveButton: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
   denyButton: { backgroundColor: "#FF6B6B", borderColor: "#FF6B6B" },
   buttonText: { color: "white", fontWeight: "bold" },
@@ -1034,28 +888,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   showMoreText: { color: "#4A90E2", fontSize: 14, fontWeight: "600" },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    width: "85%",
-    alignSelf: "center",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 },
+  modalContent: { backgroundColor: "white", borderRadius: 20, padding: 20, width: "85%", alignSelf: "center" },
   modalHint: { fontSize: 14, color: "#666", marginBottom: 10 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    backgroundColor: "#fff",
-  },
+  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#fff" },
   hideKeyboardButton: {
     flexDirection: "row",
     alignSelf: "flex-end",
@@ -1073,27 +909,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   hideKeyboardText: { color: "#4A90E2", fontSize: 13, fontWeight: "500" },
-  // Item + spec list styles
-  itemSpecList: {
-    marginTop: 4,
-    gap: 2,
-  },
-  itemSpecRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  itemSpecItemName: {
-    fontSize: 13,
-    color: "#333",
-    fontWeight: "500",
-  },
-  itemSpecDetail: {
-    fontSize: 13,
-    color: "#4A90E2",
-    fontStyle: "italic",
-    fontWeight: "400",
-  },
+  itemSpecList: { marginTop: 4, gap: 2 },
+  itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
+  itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
   paginationContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1112,14 +931,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#4A90E2",
   },
-  navButtonDisabled: {
-    borderColor: "#ccc",
-    backgroundColor: "#f5f5f5",
-  },
-  pageNumbersContainer: {
-    flexDirection: "row",
-    gap: 6,
-  },
+  navButtonDisabled: { borderColor: "#ccc", backgroundColor: "#f5f5f5" },
+  pageNumbersContainer: { flexDirection: "row", gap: 6 },
   pageButton: {
     width: 36,
     height: 36,
@@ -1130,16 +943,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
   },
-  pageButtonActive: {
-    backgroundColor: "#4A90E2",
-    borderColor: "#4A90E2",
-  },
-  pageButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-  },
-  pageButtonTextActive: {
-    color: "white",
-  },
+  pageButtonActive: { backgroundColor: "#4A90E2", borderColor: "#4A90E2" },
+  pageButtonText: { fontSize: 14, fontWeight: "600", color: "#666" },
+  pageButtonTextActive: { color: "white" },
 });
