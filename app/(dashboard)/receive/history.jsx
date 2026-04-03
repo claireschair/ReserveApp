@@ -1,11 +1,14 @@
 import { useEffect, useState, useContext } from "react";
-import { StyleSheet, ScrollView, View, TouchableOpacity, RefreshControl } from "react-native";
+import { StyleSheet, ScrollView, View, TouchableOpacity, Alert, RefreshControl } from "react-native";
 import { router } from "expo-router";
 import { useMatch } from "../../../hooks/useMatch";
+import { useReview } from "../../../hooks/useReview";
 import { UserContext } from "../../../contexts/UserContext";
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
+import StarRating from "../../../components/StarRating";
+import ReviewModal from "../../../components/ReviewModal";
 import { Ionicons } from "@expo/vector-icons";
 
 const ITEMS_PER_PAGE = 5;
@@ -24,17 +27,44 @@ function getSchoolDisplay(userData) {
 
 const ReceiveHistory = () => {
   const { getCompletedMatches } = useMatch();
+  const { submitReview, hasReviewed, getUserRating } = useReview();
   const { user } = useContext(UserContext);
-  
+
   const [completedRequests, setCompletedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [reviewedMatchIds, setReviewedMatchIds] = useState({});
+  const [partnerRatings, setPartnerRatings] = useState({});
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   const loadHistory = async () => {
     try {
       const data = await getCompletedMatches("receive");
       setCompletedRequests(data || []);
+
+      const reviewedMap = {};
+      const ratingsMap = {};
+
+      await Promise.all(
+        (data || []).map(async (request) => {
+          const [reviewed, rating] = await Promise.all([
+            hasReviewed(request.id),
+            request.match?.partner?.userId
+              ? getUserRating(request.match.partner.userId)
+              : Promise.resolve({ ratingAverage: 0, ratingCount: 0 }),
+          ]);
+          reviewedMap[request.id] = reviewed;
+          if (request.match?.partner?.userId) {
+            ratingsMap[request.match.partner.userId] = rating;
+          }
+        })
+      );
+
+      setReviewedMatchIds(reviewedMap);
+      setPartnerRatings(ratingsMap);
     } catch (err) {
       console.error("Error loading request history:", err);
     } finally {
@@ -49,32 +79,38 @@ const ReceiveHistory = () => {
   };
 
   useEffect(() => {
-    if (user?.uid) {
-      loadHistory();
-    }
+    if (user?.uid) loadHistory();
   }, [user?.uid]);
 
-  // Pagination calculations
+  const handleOpenReview = (request) => {
+    setReviewTarget({
+      matchId: request.id,
+      revieweeId: request.match?.partner?.userId,
+      partnerName: request.match?.partner?.name || null,
+    });
+    setReviewModalVisible(true);
+  };
+
+  const handleSubmitReview = async (rating, comment) => {
+    if (!reviewTarget) return;
+    setReviewLoading(true);
+    try {
+      await submitReview(reviewTarget.revieweeId, reviewTarget.matchId, rating, comment);
+      setReviewedMatchIds((prev) => ({ ...prev, [reviewTarget.matchId]: true }));
+      setReviewModalVisible(false);
+      setReviewTarget(null);
+      Alert.alert("Review submitted", "Thank you for your feedback.");
+    } catch (err) {
+      console.error("Error submitting review:", err);
+      Alert.alert("Error", err.message || "Failed to submit review.");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
   const totalPages = Math.ceil(completedRequests.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentRequests = completedRequests.slice(startIndex, endIndex);
-
-  const goToPage = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
+  const currentRequests = completedRequests.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   if (loading) {
     return (
@@ -89,40 +125,34 @@ const ReceiveHistory = () => {
     <ThemedView style={styles.pageContainer}>
       <Spacer height={100} />
       <View style={styles.headerCard}>
-        <ThemedText title style={styles.heading}>
-          Request History
-        </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          View your completed requests
-        </ThemedText>
+        <ThemedText title style={styles.heading}>Request History</ThemedText>
+        <ThemedText style={styles.subtitle}>View your completed requests</ThemedText>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {completedRequests.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="checkmark-done-circle-outline" size={64} color="#ccc" />
             <Spacer height={15} />
-            <ThemedText style={styles.emptyText}>
-              No completed requests yet
-            </ThemedText>
+            <ThemedText style={styles.emptyText}>No completed requests yet</ThemedText>
             <Spacer height={5} />
-            <ThemedText style={styles.subtleText}>
-              Your completed requests will appear here
-            </ThemedText>
+            <ThemedText style={styles.subtleText}>Your completed requests will appear here</ThemedText>
           </View>
         ) : (
           <>
             {currentRequests.map((request) => {
               const match = request.match;
-              const completedDate = request.completedAt 
+              const completedDate = request.completedAt
                 ? new Date(request.completedAt.seconds * 1000).toLocaleDateString()
                 : "Unknown date";
+              const partnerUserId = match?.partner?.userId;
+              const partnerRating = partnerUserId ? partnerRatings[partnerUserId] : null;
+              const alreadyReviewed = reviewedMatchIds[request.id];
+              const canReview = partnerUserId && !alreadyReviewed;
 
               return (
                 <View key={request.id} style={styles.historyCard}>
@@ -164,11 +194,23 @@ const ReceiveHistory = () => {
                       </ThemedText>
                     </View>
                     <View style={styles.detailRow}>
-                      <Ionicons name="star-outline" size={16} color="#666" />
+                      <Ionicons name="bar-chart-outline" size={16} color="#666" />
                       <ThemedText style={styles.detailText}>
                         Match Score: {match?.score || 0}
                       </ThemedText>
                     </View>
+                    {partnerRating && (
+                      <View style={styles.detailRow}>
+                        <Ionicons name="star-outline" size={16} color="#666" />
+                        <View style={{ marginLeft: 2 }}>
+                          <StarRating
+                            rating={partnerRating.ratingAverage}
+                            count={partnerRating.ratingCount}
+                            size={14}
+                          />
+                        </View>
+                      </View>
+                    )}
                   </View>
 
                   {match?.partnerContact?.email && (
@@ -200,43 +242,46 @@ const ReceiveHistory = () => {
                       </TouchableOpacity>
                     </>
                   )}
+
+                  <Spacer height={10} />
+
+                  {alreadyReviewed ? (
+                    <View style={styles.reviewedBadge}>
+                      <Ionicons name="checkmark-circle-outline" size={16} color="#4CAF50" />
+                      <ThemedText style={styles.reviewedText}>Review submitted</ThemedText>
+                    </View>
+                  ) : canReview ? (
+                    <TouchableOpacity
+                      style={styles.reviewButton}
+                      onPress={() => handleOpenReview(request)}
+                    >
+                      <Ionicons name="star-outline" size={16} color="#4A90E2" />
+                      <ThemedText style={styles.reviewButtonText}>Rate your experience</ThemedText>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               );
             })}
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
               <View style={styles.paginationContainer}>
                 <TouchableOpacity
-                  style={[
-                    styles.navButton,
-                    currentPage === 1 && styles.navButtonDisabled,
-                  ]}
-                  onPress={goToPreviousPage}
+                  style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+                  onPress={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
                   disabled={currentPage === 1}
                 >
-                  <Ionicons
-                    name="chevron-back"
-                    size={20}
-                    color={currentPage === 1 ? "#ccc" : "#4A90E2"}
-                  />
+                  <Ionicons name="chevron-back" size={20} color={currentPage === 1 ? "#ccc" : "#4A90E2"} />
                 </TouchableOpacity>
 
                 <View style={styles.pageNumbersContainer}>
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                     <TouchableOpacity
                       key={pageNum}
-                      style={[
-                        styles.pageButton,
-                        currentPage === pageNum && styles.pageButtonActive,
-                      ]}
-                      onPress={() => goToPage(pageNum)}
+                      style={[styles.pageButton, currentPage === pageNum && styles.pageButtonActive]}
+                      onPress={() => setCurrentPage(pageNum)}
                     >
                       <ThemedText
-                        style={[
-                          styles.pageButtonText,
-                          currentPage === pageNum && styles.pageButtonTextActive,
-                        ]}
+                        style={[styles.pageButtonText, currentPage === pageNum && styles.pageButtonTextActive]}
                       >
                         {pageNum}
                       </ThemedText>
@@ -245,11 +290,8 @@ const ReceiveHistory = () => {
                 </View>
 
                 <TouchableOpacity
-                  style={[
-                    styles.navButton,
-                    currentPage === totalPages && styles.navButtonDisabled,
-                  ]}
-                  onPress={goToNextPage}
+                  style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+                  onPress={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
                 >
                   <Ionicons
@@ -264,6 +306,17 @@ const ReceiveHistory = () => {
         )}
         <Spacer height={20} />
       </ScrollView>
+
+      <ReviewModal
+        visible={reviewModalVisible}
+        onClose={() => {
+          setReviewModalVisible(false);
+          setReviewTarget(null);
+        }}
+        onSubmit={handleSubmitReview}
+        loading={reviewLoading}
+        partnerName={reviewTarget?.partnerName}
+      />
     </ThemedView>
   );
 };
@@ -271,17 +324,8 @@ const ReceiveHistory = () => {
 export default ReceiveHistory;
 
 const styles = StyleSheet.create({
-  pageContainer: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: "#dee6ff",
-  },
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#dee6ff",
-  },
+  pageContainer: { flex: 1, padding: 15, backgroundColor: "#dee6ff" },
+  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#dee6ff" },
   headerCard: {
     backgroundColor: "#699cea",
     paddingVertical: 22,
@@ -295,40 +339,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
-  heading: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 5,
-    color: "white",
-  },
-  subtitle: {
-    fontSize: 15,
-    textAlign: "center",
-    color: "#e2f0ff",
-    lineHeight: 22,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    paddingTop: 80,
-  },
-  emptyText: {
-    fontSize: 18,
-    textAlign: "center",
-    color: "#666",
-    fontWeight: "600",
-  },
-  subtleText: {
-    fontSize: 14,
-    textAlign: "center",
-    color: "#999",
-  },
+  heading: { fontSize: 28, fontWeight: "bold", textAlign: "center", marginBottom: 5, color: "white" },
+  subtitle: { fontSize: 15, textAlign: "center", color: "#e2f0ff", lineHeight: 22 },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+  emptyContainer: { alignItems: "center", paddingTop: 80 },
+  emptyText: { fontSize: 18, textAlign: "center", color: "#666", fontWeight: "600" },
+  subtleText: { fontSize: 14, textAlign: "center", color: "#999" },
   historyCard: {
     backgroundColor: "white",
     padding: 18,
@@ -357,57 +374,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
   },
-  statusText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#4CAF50",
-  },
-  dateText: {
-    fontSize: 13,
-    color: "#888",
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#666",
-    marginBottom: 4,
-  },
-  itemsText: {
-    fontSize: 15,
-    color: "#333",
-    lineHeight: 20,
-  },
-  detailsBox: {
-    backgroundColor: "#F5F5F5",
-    padding: 12,
-    borderRadius: 10,
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: "#555",
-  },
-  contactBox: {
-    backgroundColor: "#E3F2FD",
-    padding: 12,
-    borderRadius: 10,
-  },
-  contactLabel: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#666",
-    marginBottom: 4,
-  },
-  contactEmail: {
-    fontSize: 14,
-    color: "#1976D2",
-    fontWeight: "500",
-  },
+  statusText: { fontSize: 13, fontWeight: "600", color: "#4CAF50" },
+  dateText: { fontSize: 13, color: "#888" },
+  sectionLabel: { fontSize: 14, fontWeight: "bold", color: "#666", marginBottom: 4 },
+  itemsText: { fontSize: 15, color: "#333", lineHeight: 20 },
+  detailsBox: { backgroundColor: "#F5F5F5", padding: 12, borderRadius: 10, gap: 8 },
+  detailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  detailText: { fontSize: 14, color: "#555" },
+  contactBox: { backgroundColor: "#E3F2FD", padding: 12, borderRadius: 10 },
+  contactLabel: { fontSize: 13, fontWeight: "bold", color: "#666", marginBottom: 4 },
+  contactEmail: { fontSize: 14, color: "#1976D2", fontWeight: "500" },
   chatButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -419,11 +395,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#4A90E2",
   },
-  chatButtonText: {
-    color: "#4A90E2",
-    fontSize: 15,
-    fontWeight: "600",
+  chatButtonText: { color: "#4A90E2", fontSize: 15, fontWeight: "600" },
+  reviewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF8E1",
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#F5A623",
   },
+  reviewButtonText: { color: "#E8920A", fontSize: 15, fontWeight: "600" },
+  reviewedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F5E9",
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
+  },
+  reviewedText: { fontSize: 14, color: "#4CAF50", fontWeight: "500" },
   paginationContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -442,14 +436,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#4A90E2",
   },
-  navButtonDisabled: {
-    borderColor: "#ccc",
-    backgroundColor: "#f5f5f5",
-  },
-  pageNumbersContainer: {
-    flexDirection: "row",
-    gap: 6,
-  },
+  navButtonDisabled: { borderColor: "#ccc", backgroundColor: "#f5f5f5" },
+  pageNumbersContainer: { flexDirection: "row", gap: 6 },
   pageButton: {
     width: 36,
     height: 36,
@@ -460,16 +448,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
   },
-  pageButtonActive: {
-    backgroundColor: "#4A90E2",
-    borderColor: "#4A90E2",
-  },
-  pageButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-  },
-  pageButtonTextActive: {
-    color: "white",
-  },
+  pageButtonActive: { backgroundColor: "#4A90E2", borderColor: "#4A90E2" },
+  pageButtonText: { fontSize: 14, fontWeight: "600", color: "#666" },
+  pageButtonTextActive: { color: "white" },
 });
