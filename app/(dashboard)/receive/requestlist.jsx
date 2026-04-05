@@ -46,16 +46,30 @@ function buildSpecsMap(requestDoc) {
   return map;
 }
 
-function ItemsWithSpecs({ items = [], specsMap = {} }) {
+function buildQuantitiesMap(requestDoc) {
+  const map = {};
+  if (!requestDoc?.items || !requestDoc?.quantities) return map;
+  requestDoc.items.forEach((item, idx) => {
+    const qty = requestDoc.quantities[idx];
+    if (qty != null) map[item.toLowerCase()] = qty;
+  });
+  return map;
+}
+
+function ItemsWithSpecs({ items = [], specsMap = {}, quantitiesMap = {} }) {
   if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
   return (
     <View style={styles.itemSpecList}>
       {items.map((item, idx) => {
         const spec = specsMap[item.toLowerCase()];
+        const qty = quantitiesMap[item.toLowerCase()];
         return (
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
               {item}
+              {qty != null && (
+                <ThemedText style={styles.itemSpecQty}> ({qty})</ThemedText>
+              )}
               {!!spec && <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>}
             </ThemedText>
           </View>
@@ -507,6 +521,7 @@ const RequestList = () => {
         {currentRequests.map((request) => {
           const filteredMatches = filterAndSortMatches(request);
           const mySpecsMap = buildSpecsMap(request);
+          const myQuantitiesMap = buildQuantitiesMap(request);
 
           const pendingMatch = filteredMatches.find((m) => m.status === "pending" && !m.partnerContact);
           const approvedMatch = filteredMatches.find(
@@ -522,7 +537,11 @@ const RequestList = () => {
               <View style={styles.requestHeader}>
                 <View style={styles.requestHeaderText}>
                   <ThemedText style={styles.requestTitle}>Requested Items:</ThemedText>
-                  <ItemsWithSpecs items={request.items || []} specsMap={mySpecsMap} />
+                  <ItemsWithSpecs
+                    items={request.items || []}
+                    specsMap={mySpecsMap}
+                    quantitiesMap={myQuantitiesMap}
+                  />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(request.location)}
                   </ThemedText>
@@ -576,6 +595,7 @@ const RequestList = () => {
                     <ItemsWithSpecs
                       items={completedMatch.items || []}
                       specsMap={buildSpecsMap(completedMatch.partner)}
+                      quantitiesMap={buildQuantitiesMap(completedMatch.partner)}
                     />
                     <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>Donor School:</ThemedText>
                     <ThemedText style={styles.matchDetailText}>{getSchoolDisplay(completedMatch.partner)}</ThemedText>
@@ -612,6 +632,7 @@ const RequestList = () => {
                   <ItemsWithSpecs
                     items={pendingMatch.partner?.items || []}
                     specsMap={buildSpecsMap(pendingMatch.partner)}
+                    quantitiesMap={buildQuantitiesMap(pendingMatch.partner)}
                   />
                   <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
                     Match Score: {pendingMatch.score || 0}
@@ -646,7 +667,11 @@ const RequestList = () => {
                           {m.completeness !== undefined && ` | ${(m.completeness * 100).toFixed(0)}% match`}
                         </ThemedText>
                         <ThemedText style={styles.subtle}>Available:</ThemedText>
-                        <ItemsWithSpecs items={m.partner?.items || []} specsMap={buildSpecsMap(m.partner)} />
+                        <ItemsWithSpecs
+                          items={m.partner?.items || []}
+                          specsMap={buildSpecsMap(m.partner)}
+                          quantitiesMap={buildQuantitiesMap(m.partner)}
+                        />
                         <ThemedText style={styles.subtle}>
                           Donation Location: {getLocationDisplay(m.partner?.location)}
                         </ThemedText>
@@ -1018,5 +1043,6 @@ const styles = StyleSheet.create({
   itemSpecList: { marginTop: 4, gap: 2 },
   itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
+  itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
 });

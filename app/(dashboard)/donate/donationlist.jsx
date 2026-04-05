@@ -46,16 +46,30 @@ function buildSpecsMap(requestDoc) {
   return map;
 }
 
-function ItemsWithSpecs({ items = [], specsMap = {} }) {
+function buildQuantitiesMap(requestDoc) {
+  const map = {};
+  if (!requestDoc?.items || !requestDoc?.quantities) return map;
+  requestDoc.items.forEach((item, idx) => {
+    const qty = requestDoc.quantities[idx];
+    if (qty != null) map[item.toLowerCase()] = qty;
+  });
+  return map;
+}
+
+function ItemsWithSpecs({ items = [], specsMap = {}, quantitiesMap = {} }) {
   if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
   return (
     <View style={styles.itemSpecList}>
       {items.map((item, idx) => {
         const spec = specsMap[item.toLowerCase()];
+        const qty = quantitiesMap[item.toLowerCase()];
         return (
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
               {item}
+              {qty != null && (
+                <ThemedText style={styles.itemSpecQty}> ({qty})</ThemedText>
+              )}
               {!!spec && <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>}
             </ThemedText>
           </View>
@@ -466,6 +480,7 @@ const DonationList = () => {
         {currentDonations.map((donation) => {
           const filteredMatches = filterAndSortMatches(donation);
           const mySpecsMap = buildSpecsMap(donation);
+          const myQuantitiesMap = buildQuantitiesMap(donation);
 
           const pendingRequests = filteredMatches.filter((m) => m.status === "pending" && !m.myContact);
           const waitingForRequestor = filteredMatches.filter(
@@ -481,7 +496,11 @@ const DonationList = () => {
               <View style={styles.donationHeader}>
                 <View style={styles.donationHeaderText}>
                   <ThemedText style={styles.donationTitle}>Donation Items:</ThemedText>
-                  <ItemsWithSpecs items={donation.items || []} specsMap={mySpecsMap} />
+                  <ItemsWithSpecs
+                    items={donation.items || []}
+                    specsMap={mySpecsMap}
+                    quantitiesMap={myQuantitiesMap}
+                  />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(donation.location)}
                   </ThemedText>
@@ -516,6 +535,7 @@ const DonationList = () => {
                         <ItemsWithSpecs
                           items={match.partner?.items || []}
                           specsMap={buildSpecsMap(match.partner)}
+                          quantitiesMap={buildQuantitiesMap(match.partner)}
                         />
                         <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
                           Match Score: {match.score || 0}
@@ -578,6 +598,7 @@ const DonationList = () => {
                       <ItemsWithSpecs
                         items={match.partner?.items || []}
                         specsMap={buildSpecsMap(match.partner)}
+                        quantitiesMap={buildQuantitiesMap(match.partner)}
                       />
                       <ThemedText style={styles.subtle}>School: {getSchoolDisplay(match.partner)}</ThemedText>
                     </View>
@@ -605,7 +626,11 @@ const DonationList = () => {
 
                       <View style={styles.matchDetailsBox}>
                         <ThemedText style={styles.matchDetailLabel}>Matched Items:</ThemedText>
-                        <ItemsWithSpecs items={match.items || []} specsMap={mySpecsMap} />
+                        <ItemsWithSpecs
+                          items={match.items || []}
+                          specsMap={mySpecsMap}
+                          quantitiesMap={myQuantitiesMap}
+                        />
                         <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>School:</ThemedText>
                         <ThemedText style={styles.matchDetailText}>{getSchoolDisplay(match.partner)}</ThemedText>
                       </View>
@@ -912,6 +937,7 @@ const styles = StyleSheet.create({
   itemSpecList: { marginTop: 4, gap: 2 },
   itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
+  itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
   paginationContainer: {
     flexDirection: "row",
