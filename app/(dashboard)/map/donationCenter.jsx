@@ -151,9 +151,11 @@ const SelectDonationLocation = () => {
 
   return (
     <ThemedView style={styles.container}>
+      
       <View style={styles.backButtonContainer}>
         <AppBackButton />
       </View>
+
       <View style={styles.searchOverlay}>
         <PlaceSearchInput
           onSelect={({ name, latitude, longitude }) => {

@@ -1,6 +1,6 @@
 import { StyleSheet, View, Image, Dimensions, Text, TouchableOpacity, ActivityIndicator, Alert, Switch, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import React, { useEffect, useState } from 'react';
 import { 
   updateNotificationPreference, 
@@ -105,7 +105,7 @@ const Profile = () => {
           <>
             <Spacer height={8} />
             <View style={styles.schoolBadge}>
-              <Ionicons name="school-outline" size={18} color="#4A90E2" />
+              <FontAwesome6 name="school" size={14} color="#4A90E2"/>
               <ThemedText style={styles.schoolText}>
                 {user.school.schoolName}
               </ThemedText>
@@ -132,8 +132,36 @@ const Profile = () => {
         </ThemedButton>
       </View>
 
-      <Spacer height={25} />
+      <View style={styles.impactSection}>
+        <ThemedText style={styles.impactTitle}>Your Impact</ThemedText>
+        <Spacer height={15} />
 
+        <View style={styles.impactRow}>
+          <View style={styles.impactCard}>
+            <Ionicons name="school-outline" size={28} color="#4A90E2" />
+            <ThemedText style={styles.impactNumber}>
+              {/*PLEASE HELP FAYE*/} 
+              {user?.stats?.donations || 0}
+            </ThemedText>
+            <ThemedText style={styles.impactLabel}>
+              Donations Made
+            </ThemedText>
+          </View>
+      
+          <View style={styles.impactCard}>
+            <Ionicons name="heart-outline" size={28} color="#4A90E2" />
+            <ThemedText style={styles.impactNumber}>
+              {/*PLEASE HELP FAYE*/} 
+              {user?.stats?.points || 0}
+            </ThemedText>
+            <ThemedText style={styles.impactLabel}>
+              Items Recieved
+            </ThemedText>
+          </View>
+        </View>
+      </View>
+
+      <Spacer height={25} />
       <View style={styles.settingsContainer}>
         <View style={styles.card}>
           <SettingsRow
@@ -425,5 +453,54 @@ const styles = StyleSheet.create({
   rowValue: {
     fontSize: 14,
     color: '#999',
+  },
+  impactSection: {
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 10,
+  },
+
+  impactTitle: {
+   fontSize: 22,
+   fontWeight: '700',
+   color: '#4A90E2',
+   textAlign: 'center',
+  },
+
+  impactRow: {
+    flexDirection: 'row',
+  },
+
+  impactCard: {
+    flex: 1,
+    marginHorizontal: 15,
+    width: '35%',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    paddingVertical: 15,
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: '#bed1e7',
+    
+
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
+  impactNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 5,
+  },
+
+  impactLabel: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 3,
+    color: '#555',
   },
 });

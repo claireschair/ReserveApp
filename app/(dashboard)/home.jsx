@@ -109,7 +109,27 @@ const Home = () => {
             </View>
           </View>
 
-          <Spacer />
+          <View style={styles.mascotSection}>
+            <Image 
+              source={require('../../assets/icons/mascot.png')} 
+              style={styles.mascotLarge}
+            />
+
+            <View style={styles.speechWrapper}>
+              <View style={styles.speechBubble}>
+                <ThemedText style={styles.mascotTitle}>
+                  Make an Impact
+                </ThemedText>
+                <ThemedText style={styles.mascotText}>
+                  Even one notebook can change a student’s day. Start small, and make a difference that lasts.
+                </ThemedText>
+              </View>
+          
+              <View style={styles.speechTailBorder} />
+              <View style={styles.speechTail} />
+            </View>
+          </View>
+
 
           <View style={styles.howItWorksCard}>
             <ThemedText style={styles.subheading}>
@@ -146,7 +166,32 @@ const Home = () => {
           </View>
         </View>
 
-        <Spacer height={100} />
+        <Spacer height={25} />
+        <ThemedText style={styles.subheading}>
+              Personal Statements
+            </ThemedText>
+        <View style={styles.storyCard}>
+          {/* Why this card have a different color omg - faye*/}
+          <ThemedText style={styles.storyText}>
+            “Reserve is one step forward in increasing access to school supplies.”
+          </ThemedText>
+          <ThemedText style={styles.storyAuthor}>
+            — Local Teacher
+          </ThemedText>
+        </View>
+        <View style={styles.storyCard}>
+          <ThemedText style={styles.storyText}>
+            “Reserve is a way to build confidence in your students by putting their own supplies in their hands.”
+          </ThemedText>
+          <ThemedText style={styles.storyAuthor}>
+            — Local Teacher
+          </ThemedText>
+        </View>
+
+        <View style={styles.footer}>
+          <ThemedText style={styles.footerText}>About • Contact • Privacy</ThemedText>
+          <ThemedText style={styles.footerSub}>© 2026 Reserve</ThemedText>
+        </View>
 
       </ScrollView>
     </ThemedView>
@@ -163,7 +208,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     width: "100%",
-    height: "30%",
+    height: "20%",
     backgroundColor: "#4A90E2",
     zIndex: 0,
   },
@@ -304,4 +349,125 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
+  storyCard:{
+    width: '85%',
+    alignSelf: 'center',
+    marginTop: 10,
+    backgroundColor: 'rgb(255, 255, 255)',
+    borderRadius: 20,
+    padding: 20,
+
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 3,
+  },
+  storyText:{
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  storyAuthor:{
+    marginTop: 10,
+    fontSize: 12,
+    textAlign: 'center',
+    color: 'gray',
+  },
+  footer: {
+    marginTop: 50,
+    paddingBottom: 30,
+    alignItems: 'center',
+  },
+
+  footerText: {
+    fontSize: 13,
+    color: 'gray',
+  },
+
+  footerSub: {
+   fontSize: 11,
+   color: 'lightgray',
+    marginTop: 5,
+  },
+  mascotSection: {
+  width: '90%',
+  alignSelf: 'center',
+  flexDirection: 'row',
+  alignItems: 'flex-end',
+  marginTop: 15,
+  zIndex: 3,
+},
+mascotLarge: {
+  width: 220,  
+  height: 220,
+  marginLeft: -25,
+  resizeMode: 'contain',
+  top: 10,
+},
+speechWrapper: {
+  flex: 1,
+  marginLeft: 10,
+  position: 'relative',
+},
+
+speechBubble: {
+  backgroundColor: '#ffffff',
+  borderRadius: 20,
+  padding: 15,
+  left: -10,
+
+  borderWidth: 2,
+  borderColor: '#4A90E2',
+
+  shadowColor: '#000',
+  shadowOpacity: 0.08,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 5 },
+  elevation: 4,
+  marginBottom: 10,
+},
+speechTail: {
+  position: 'absolute',
+  left: -20,
+  bottom: 46,
+
+  width: 0,
+  height: 0,
+  borderTopWidth: 11,
+  borderBottomWidth: 11,
+  borderRightWidth: 14,
+  borderTopColor: 'transparent',
+  borderBottomColor: 'transparent',
+  borderRightColor: '#ffffff',
+},
+
+speechTailBorder: {
+  position: 'absolute',
+  left: -23,    
+  bottom: 45,
+
+  width: 0,
+  height: 0,
+
+  borderTopWidth: 12,
+  borderBottomWidth: 12,
+  borderRightWidth: 14,
+
+  borderTopColor: 'transparent',
+  borderBottomColor: 'transparent',
+  borderRightColor: '#4A90E2',
+},
+
+mascotTitle: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#4A90E2',
+  marginBottom: 5,
+},
+
+mascotText: {
+  fontSize: 13,
+  lineHeight: 18,
+  color: '#333',
+},
 });

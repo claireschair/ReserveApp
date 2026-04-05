@@ -22,6 +22,8 @@ import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
 import { Ionicons } from "@expo/vector-icons";
+import AppBackButton from "../../components/AppBackButton";
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 const PERSPECTIVE_API_KEY = process.env.EXPO_PUBLIC_PERSPECTIVE_API_KEY;
 const bannedWords = [
@@ -406,19 +408,27 @@ const ChatScreen = () => {
 
   return (
     <ThemedView style={styles.container}>
-      <Spacer height={60} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <ThemedText style={styles.backButton}>← Back</ThemedText>
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <AppBackButton />
+        </View>
+
         <ThemedText style={styles.headerTitle}>Match Chat</ThemedText>
-        {!isCompleted && !isClosed && (
-          <TouchableOpacity onPress={handleOpenReportModal}>
-            <ThemedText style={styles.reportButton}>Report</ThemedText>
-          </TouchableOpacity>
-        )}
-        {(isCompleted || isClosed) && <View style={{ width: 60 }} />}
+
+        <View style={styles.headerRight}>
+          {!isCompleted && !isClosed ? (
+            <TouchableOpacity 
+              onPress={handleOpenReportModal}
+              style={styles.reportButtonContainer}
+            >
+              <MaterialIcons name="report-problem" size={18} color="red" />
+              <ThemedText style={styles.reportButtonText}>Report</ThemedText>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 60 }} />
+          )}
+        </View>
       </View>
 
       {/* Completed Match Banner */}
@@ -472,7 +482,6 @@ const ChatScreen = () => {
           }
         />
 
-        {/* Only show input if chat is active and not completed */}
         {canSendMessages && (
           <View style={styles.inputContainer}>
             <TextInput
@@ -495,7 +504,10 @@ const ChatScreen = () => {
               onPress={handleSend}
               disabled={!inputText.trim() || isBusy}
             >
-              <ThemedText style={styles.sendButtonText}>{sendLabel}</ThemedText>
+              <View style ={styles.sendButtonContainer}>
+                <ThemedText style={styles.sendButtonText}>{sendLabel}</ThemedText>
+                <Ionicons name="send" size={14} color="white" />
+              </View>
             </TouchableOpacity>
           </View>
         )}
@@ -604,17 +616,30 @@ export default ChatScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F3F6FB", 
   },
   header: {
+    paddingTop: 60,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    paddingVertical: 14,
+    backgroundColor: "#ffffff",
+
+    shadowColor: "#4A90E2",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  headerLeft:{
+    width:50,
+    alignItems: "flex-start",
+  },
+  headerRight:{
+    width:60,
+    alignItems: "flex-end",
   },
   backButton: {
     color: "#4A90E2",
@@ -624,9 +649,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-  reportButton: {
+ reportButtonContainer: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+
+  backgroundColor: "#FFEAEA", 
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 14,
+
+  borderWidth: 1,
+  borderColor: "#FFD6D6",
+
+  shadowColor: "#FF6B6B",
+  shadowOpacity: 0.08,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
+  paddingHorizontal: 5,
+  },
+
+  reportButtonText: {
     color: "#FF6B6B",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
   },
   completedBanner: {
@@ -699,18 +745,26 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   messageBubble: {
-    maxWidth: "75%",
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 8,
+     maxWidth: "75%",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginBottom: 10,
   },
   myMessage: {
     alignSelf: "flex-end",
     backgroundColor: "#4A90E2",
+    borderBottomRightRadius: 6,
   },
   theirMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "white",
+    backgroundColor: "#ffffff",
+    borderBottomLeftRadius: 6,
+    shadowColor: "#4A90E2",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   messageText: {
     fontSize: 15,
@@ -723,8 +777,9 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   timestamp: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 4,
+    opacity: 0.8,
   },
   myTimestamp: {
     color: "rgba(255, 255, 255, 0.7)",
@@ -735,11 +790,18 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: "row",
-    padding: 12,
-    backgroundColor: "white",
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    alignItems: "flex-end",
+    padding: 10,
+    margin: 10,
+    marginBottom: 22,
+    borderRadius: 30,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+
+    shadowColor: "#4A90E2",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   input: {
     flex: 1,
@@ -757,7 +819,7 @@ const styles = StyleSheet.create({
   sendButton: {
     backgroundColor: "#4A90E2",
     borderRadius: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     paddingVertical: 10,
     justifyContent: "center",
     alignItems: "center",
@@ -879,5 +941,10 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: "white",
     fontWeight: "600",
+  },
+  sendButtonContainer:{
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
