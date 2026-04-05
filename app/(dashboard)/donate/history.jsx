@@ -8,7 +8,7 @@ import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import StarRating from "../../../components/StarRating";
-import ReviewModal from "../../../components/ReviewModal";
+import AppModal from "../../../components/AppModal";
 import { Ionicons } from "@expo/vector-icons";
 
 const ITEMS_PER_PAGE = 5;
@@ -36,7 +36,7 @@ const DonateHistory = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [reviewedMatchIds, setReviewedMatchIds] = useState({});
   const [partnerRatings, setPartnerRatings] = useState({});
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewLoading, setReviewLoading] = useState(false);
 
@@ -50,16 +50,15 @@ const DonateHistory = () => {
 
       await Promise.all(
         (data || []).map(async (donation) => {
+          const partnerUserId = donation.match?.partner?.userId;
           const [reviewed, rating] = await Promise.all([
             hasReviewed(donation.id),
-            donation.match?.partner?.userId
-              ? getUserRating(donation.match.partner.userId)
+            partnerUserId
+              ? getUserRating(partnerUserId)
               : Promise.resolve({ ratingAverage: 0, ratingCount: 0 }),
           ]);
           reviewedMap[donation.id] = reviewed;
-          if (donation.match?.partner?.userId) {
-            ratingsMap[donation.match.partner.userId] = rating;
-          }
+          if (partnerUserId) ratingsMap[partnerUserId] = rating;
         })
       );
 
@@ -88,7 +87,7 @@ const DonateHistory = () => {
       revieweeId: donation.match?.partner?.userId,
       partnerName: donation.match?.partner?.name || null,
     });
-    setReviewModalVisible(true);
+    setModalVisible(true);
   };
 
   const handleSubmitReview = async (rating, comment) => {
@@ -97,7 +96,7 @@ const DonateHistory = () => {
     try {
       await submitReview(reviewTarget.revieweeId, reviewTarget.matchId, rating, comment);
       setReviewedMatchIds((prev) => ({ ...prev, [reviewTarget.matchId]: true }));
-      setReviewModalVisible(false);
+      setModalVisible(false);
       setReviewTarget(null);
       Alert.alert("Review submitted", "Thank you for your feedback.");
     } catch (err) {
@@ -140,7 +139,9 @@ const DonateHistory = () => {
             <Spacer height={15} />
             <ThemedText style={styles.emptyText}>No completed donations yet</ThemedText>
             <Spacer height={5} />
-            <ThemedText style={styles.subtleText}>Your completed donations will appear here</ThemedText>
+            <ThemedText style={styles.subtleText}>
+              Your completed donations will appear here
+            </ThemedText>
           </View>
         ) : (
           <>
@@ -150,6 +151,7 @@ const DonateHistory = () => {
                 ? new Date(donation.completedAt.seconds * 1000).toLocaleDateString()
                 : "Unknown date";
               const partnerUserId = match?.partner?.userId;
+              const partnerName = match?.partner?.name;
               const partnerRating = partnerUserId ? partnerRatings[partnerUserId] : null;
               const alreadyReviewed = reviewedMatchIds[donation.id];
               const canReview = partnerUserId && !alreadyReviewed;
@@ -199,7 +201,7 @@ const DonateHistory = () => {
                         Match Score: {match?.score || 0}
                       </ThemedText>
                     </View>
-                    {partnerRating && (
+                    {partnerRating && partnerRating.ratingCount > 0 && (
                       <View style={styles.detailRow}>
                         <Ionicons name="star-outline" size={16} color="#666" />
                         <View style={{ marginLeft: 2 }}>
@@ -213,14 +215,19 @@ const DonateHistory = () => {
                     )}
                   </View>
 
-                  {match?.partnerContact?.email && (
+                  {(partnerName || match?.partnerContact?.email) && (
                     <>
                       <Spacer height={10} />
                       <View style={styles.contactBox}>
                         <ThemedText style={styles.contactLabel}>Requestor Contact:</ThemedText>
-                        <ThemedText style={styles.contactEmail}>
-                          {match.partnerContact.email}
-                        </ThemedText>
+                        {partnerName && (
+                          <ThemedText style={styles.contactName}>{partnerName}</ThemedText>
+                        )}
+                        {match?.partnerContact?.email && (
+                          <ThemedText style={styles.contactEmail}>
+                            {match.partnerContact.email}
+                          </ThemedText>
+                        )}
                       </View>
                     </>
                   )}
@@ -255,7 +262,7 @@ const DonateHistory = () => {
                       style={styles.reviewButton}
                       onPress={() => handleOpenReview(donation)}
                     >
-                      <Ionicons name="star-outline" size={16} color="#4A90E2" />
+                      <Ionicons name="star-outline" size={16} color="#E8920A" />
                       <ThemedText style={styles.reviewButtonText}>Rate your experience</ThemedText>
                     </TouchableOpacity>
                   ) : null}
@@ -270,7 +277,11 @@ const DonateHistory = () => {
                   onPress={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
                   disabled={currentPage === 1}
                 >
-                  <Ionicons name="chevron-back" size={20} color={currentPage === 1 ? "#ccc" : "#4A90E2"} />
+                  <Ionicons
+                    name="chevron-back"
+                    size={20}
+                    color={currentPage === 1 ? "#ccc" : "#4A90E2"}
+                  />
                 </TouchableOpacity>
 
                 <View style={styles.pageNumbersContainer}>
@@ -281,7 +292,10 @@ const DonateHistory = () => {
                       onPress={() => setCurrentPage(pageNum)}
                     >
                       <ThemedText
-                        style={[styles.pageButtonText, currentPage === pageNum && styles.pageButtonTextActive]}
+                        style={[
+                          styles.pageButtonText,
+                          currentPage === pageNum && styles.pageButtonTextActive,
+                        ]}
                       >
                         {pageNum}
                       </ThemedText>
@@ -307,14 +321,15 @@ const DonateHistory = () => {
         <Spacer height={20} />
       </ScrollView>
 
-      <ReviewModal
-        visible={reviewModalVisible}
+      <AppModal
+        visible={modalVisible}
         onClose={() => {
-          setReviewModalVisible(false);
+          setModalVisible(false);
           setReviewTarget(null);
         }}
-        onSubmit={handleSubmitReview}
+        mode="review"
         loading={reviewLoading}
+        onSubmitReview={handleSubmitReview}
         partnerName={reviewTarget?.partnerName}
       />
     </ThemedView>
@@ -382,7 +397,8 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   detailText: { fontSize: 14, color: "#555" },
   contactBox: { backgroundColor: "#E3F2FD", padding: 12, borderRadius: 10 },
-  contactLabel: { fontSize: 13, fontWeight: "bold", color: "#666", marginBottom: 4 },
+  contactLabel: { fontSize: 13, fontWeight: "bold", color: "#555", marginBottom: 6 },
+  contactName: { fontSize: 15, color: "#1565C0", fontWeight: "600", marginBottom: 2 },
   contactEmail: { fontSize: 14, color: "#1976D2", fontWeight: "500" },
   chatButton: {
     flexDirection: "row",

@@ -19,7 +19,7 @@ import { UserContext } from "../../../contexts/UserContext";
 import Spacer from "../../../components/Spacer";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
-import MatchCompletionModal from "../../../components/MatchCompletionModal";
+import AppModal from "../../../components/AppModal";
 import { Ionicons } from "@expo/vector-icons";
 
 const REQUESTS_PER_PAGE = 5;
@@ -46,17 +46,28 @@ function buildSpecsMap(requestDoc) {
   return map;
 }
 
-function ItemsWithSpecs({ items = [], specsMap = {} }) {
+function buildQuantitiesMap(requestDoc) {
+  const map = {};
+  if (!requestDoc?.items || !requestDoc?.quantities) return map;
+  requestDoc.items.forEach((item, idx) => {
+    map[item.toLowerCase()] = requestDoc.quantities[idx] || 1;
+  });
+  return map;
+}
+
+function ItemsWithSpecs({ items = [], specsMap = {}, quantitiesMap = {} }) {
   if (!items.length) return <ThemedText style={styles.subtle}>N/A</ThemedText>;
   return (
     <View style={styles.itemSpecList}>
       {items.map((item, idx) => {
         const spec = specsMap[item.toLowerCase()];
+        const qty = quantitiesMap[item.toLowerCase()];
         return (
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
               {item}
-              {!!spec && <ThemedText style={styles.itemSpecDetail}> - {spec}</ThemedText>}
+              {qty > 0 && <ThemedText style={styles.itemSpecQty}> ({qty})</ThemedText>}
+              {!!spec && <ThemedText style={styles.itemSpecDetail}> — {spec}</ThemedText>}
             </ThemedText>
           </View>
         );
@@ -101,6 +112,7 @@ const RequestList = () => {
   const [completionModalVisible, setCompletionModalVisible] = useState(false);
   const [completionTargetId, setCompletionTargetId] = useState(null);
   const [completionLoading, setCompletionLoading] = useState(false);
+  const [completionMatchedItems, setCompletionMatchedItems] = useState([]);
 
   const loadRequests = async () => {
     try {
@@ -333,11 +345,31 @@ const RequestList = () => {
   };
 
   const handleOpenCompletionModal = (requestId) => {
+    const request = requests.find((r) => r.id === requestId);
+    const match = request?.matches?.find((m) => m.status === "matched");
+    const mySpecsMap = buildSpecsMap(request);
+
+    const matched = (match?.items || []).map((itemName) => {
+      const requestorIdx = (request?.items || []).findIndex(
+        (i) => i.toLowerCase() === itemName.toLowerCase()
+      );
+      const donorIdx = (match?.partner?.items || []).findIndex(
+        (i) => i.toLowerCase() === itemName.toLowerCase()
+      );
+      return {
+        name: itemName,
+        spec: mySpecsMap[itemName.toLowerCase()] || "",
+        donorQty: donorIdx !== -1 ? (match?.partner?.quantities?.[donorIdx] || 1) : 1,
+        requestorQty: requestorIdx !== -1 ? (request?.quantities?.[requestorIdx] || 1) : 1,
+      };
+    });
+
     setCompletionTargetId(requestId);
+    setCompletionMatchedItems(matched);
     setCompletionModalVisible(true);
   };
 
-  const handleConfirmCompletion = async (completionType) => {
+  const handleConfirmCompletion = async (completionType, exchangedQuantities) => {
     setCompletionLoading(true);
     try {
       let chatId = null;
@@ -353,10 +385,11 @@ const RequestList = () => {
         }
       }
 
-      const result = await completeMatch(completionTargetId, chatId, completionType);
+      const result = await completeMatch(completionTargetId, chatId, completionType, exchangedQuantities);
 
       setCompletionModalVisible(false);
       setCompletionTargetId(null);
+      setCompletionMatchedItems([]);
 
       if (completionType === "complete") {
         if (result?.requestorResubmitted && result.requestorLeftoverCount > 0) {
@@ -507,6 +540,7 @@ const RequestList = () => {
         {currentRequests.map((request) => {
           const filteredMatches = filterAndSortMatches(request);
           const mySpecsMap = buildSpecsMap(request);
+          const myQuantitiesMap = buildQuantitiesMap(request);
 
           const pendingMatch = filteredMatches.find((m) => m.status === "pending" && !m.partnerContact);
           const approvedMatch = filteredMatches.find(
@@ -522,7 +556,7 @@ const RequestList = () => {
               <View style={styles.requestHeader}>
                 <View style={styles.requestHeaderText}>
                   <ThemedText style={styles.requestTitle}>Requested Items:</ThemedText>
-                  <ItemsWithSpecs items={request.items || []} specsMap={mySpecsMap} />
+                  <ItemsWithSpecs items={request.items || []} specsMap={mySpecsMap} quantitiesMap={myQuantitiesMap} />
                   <ThemedText style={styles.subtle}>
                     Location: {getLocationDisplay(request.location)}
                   </ThemedText>
@@ -564,6 +598,11 @@ const RequestList = () => {
 
                   <View style={styles.contactInfoBox}>
                     <ThemedText style={styles.sectionTitle}>Donor Contact:</ThemedText>
+                    {completedMatch.partner?.name && (
+                      <ThemedText style={styles.contactDetail}>
+                        Name: {completedMatch.partner.name}
+                      </ThemedText>
+                    )}
                     <ThemedText style={styles.contactDetail}>
                       Email: {completedMatch.partnerContact?.email || "Not provided"}
                     </ThemedText>
@@ -576,6 +615,7 @@ const RequestList = () => {
                     <ItemsWithSpecs
                       items={completedMatch.items || []}
                       specsMap={buildSpecsMap(completedMatch.partner)}
+                      quantitiesMap={buildQuantitiesMap(completedMatch.partner)}
                     />
                     <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>Donor School:</ThemedText>
                     <ThemedText style={styles.matchDetailText}>{getSchoolDisplay(completedMatch.partner)}</ThemedText>
@@ -612,6 +652,7 @@ const RequestList = () => {
                   <ItemsWithSpecs
                     items={pendingMatch.partner?.items || []}
                     specsMap={buildSpecsMap(pendingMatch.partner)}
+                    quantitiesMap={buildQuantitiesMap(pendingMatch.partner)}
                   />
                   <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
                     Match Score: {pendingMatch.score || 0}
@@ -646,7 +687,7 @@ const RequestList = () => {
                           {m.completeness !== undefined && ` | ${(m.completeness * 100).toFixed(0)}% match`}
                         </ThemedText>
                         <ThemedText style={styles.subtle}>Available:</ThemedText>
-                        <ItemsWithSpecs items={m.partner?.items || []} specsMap={buildSpecsMap(m.partner)} />
+                        <ItemsWithSpecs items={m.partner?.items || []} specsMap={buildSpecsMap(m.partner)} quantitiesMap={buildQuantitiesMap(m.partner)} />
                         <ThemedText style={styles.subtle}>
                           Donation Location: {getLocationDisplay(m.partner?.location)}
                         </ThemedText>
@@ -772,14 +813,17 @@ const RequestList = () => {
         </View>
       </Modal>
 
-      <MatchCompletionModal
+      <AppModal
         visible={completionModalVisible}
         onClose={() => {
           setCompletionModalVisible(false);
           setCompletionTargetId(null);
+          setCompletionMatchedItems([]);
         }}
-        onConfirm={handleConfirmCompletion}
+        mode="completion"
+        onConfirmCompletion={handleConfirmCompletion}
         loading={completionLoading}
+        matchedItems={completionMatchedItems}
       />
     </ThemedView>
   );
@@ -1018,5 +1062,6 @@ const styles = StyleSheet.create({
   itemSpecList: { marginTop: 4, gap: 2 },
   itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
+  itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
 });

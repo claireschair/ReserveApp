@@ -269,25 +269,55 @@ export function MatchProvider({ children }) {
     return map;
   }
 
-  function calculateLeftoverItems(donorRequest, requestorRequest, matchedItems) {
-    const matchedSet = new Set(matchedItems.map((i) => i.toLowerCase().trim()));
+  function calculateLeftoverItems(donorRequest, requestorRequest, exchangedQuantities) {
+    // exchangedQuantities: { itemNameLower: quantityActuallyExchanged }
+    // Items not present in exchangedQuantities were not exchanged at all.
 
-    const getLeftovers = (request) => {
-      const leftoverIndices = request.items.reduce((acc, item, idx) => {
-        if (!matchedSet.has(item.toLowerCase().trim())) acc.push(idx);
-        return acc;
-      }, []);
-      if (leftoverIndices.length === 0) return null;
-      return {
-        items: leftoverIndices.map((idx) => request.items[idx]),
-        quantities: leftoverIndices.map((idx) => request.quantities?.[idx] || 1),
-        specs: leftoverIndices.map((idx) => request.specs?.[idx] || ""),
-      };
+    const getLeftovers = (request, role) => {
+      const leftoverItems = [];
+      const leftoverQuantities = [];
+      const leftoverSpecs = [];
+
+      request.items.forEach((item, idx) => {
+        const key = item.toLowerCase().trim();
+        const originalQty = request.quantities?.[idx] || 1;
+        const spec = request.specs?.[idx] || "";
+
+        if (!(key in exchangedQuantities)) {
+          // Item was not exchanged at all — resubmit full quantity
+          leftoverItems.push(item);
+          leftoverQuantities.push(originalQty);
+          leftoverSpecs.push(spec);
+        } else {
+          const exchangedQty = exchangedQuantities[key];
+          if (role === "donor") {
+            // Donor resubmits however many they had beyond what was taken
+            const remaining = originalQty - exchangedQty;
+            if (remaining > 0) {
+              leftoverItems.push(item);
+              leftoverQuantities.push(remaining);
+              leftoverSpecs.push(spec);
+            }
+          } else {
+            // Requestor resubmits however many they still need
+            const requestedQty = originalQty;
+            const remaining = requestedQty - exchangedQty;
+            if (remaining > 0) {
+              leftoverItems.push(item);
+              leftoverQuantities.push(remaining);
+              leftoverSpecs.push(spec);
+            }
+          }
+        }
+      });
+
+      if (leftoverItems.length === 0) return null;
+      return { items: leftoverItems, quantities: leftoverQuantities, specs: leftoverSpecs };
     };
 
     return {
-      donorLeftovers: getLeftovers(donorRequest),
-      requestorLeftovers: getLeftovers(requestorRequest),
+      donorLeftovers: getLeftovers(donorRequest, "donor"),
+      requestorLeftovers: getLeftovers(requestorRequest, "requestor"),
     };
   }
 
@@ -336,7 +366,7 @@ export function MatchProvider({ children }) {
     return { title: "Match Closed", body: "Your match has been closed." };
   }
 
-  async function completeMatch(requestId, chatId = null, completionType = "complete") {
+  async function completeMatch(requestId, chatId = null, completionType = "complete", exchangedQuantities = {}) {
     if (!userId) return null;
 
     try {
@@ -386,12 +416,13 @@ export function MatchProvider({ children }) {
       let requestorLeftoverCount = 0;
 
       if (completionType === "complete" || completionType === "partial") {
-        const matchResult = calculateMatchScore(donorRequest, requestorRequest);
-        const matchedItems = matchResult?.overlap || [];
+        // For "complete", exchangedQuantities reflects full matched amounts.
+        // For "partial", exchangedQuantities reflects what was actually handed over.
+        // calculateLeftoverItems uses this to figure out remainders for both sides.
         const { donorLeftovers, requestorLeftovers } = calculateLeftoverItems(
           donorRequest,
           requestorRequest,
-          matchedItems
+          exchangedQuantities
         );
 
         if (donorLeftovers) {
