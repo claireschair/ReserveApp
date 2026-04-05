@@ -62,7 +62,6 @@ function ItemsWithSpecs({ items = [], specsMap = {}, quantitiesMap = {} }) {
       {items.map((item, idx) => {
         const spec = specsMap[item.toLowerCase()];
         const qty = quantitiesMap[item.toLowerCase()];
-        const qty = quantitiesMap[item.toLowerCase()];
         return (
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
@@ -500,7 +499,6 @@ const DonationList = () => {
           const filteredMatches = filterAndSortMatches(donation);
           const mySpecsMap = buildSpecsMap(donation);
           const myQuantitiesMap = buildQuantitiesMap(donation);
-          const myQuantitiesMap = buildQuantitiesMap(donation);
 
           const pendingRequests = filteredMatches.filter((m) => m.status === "pending" && !m.myContact);
           const waitingForRequestor = filteredMatches.filter(
@@ -551,7 +549,6 @@ const DonationList = () => {
                         <ItemsWithSpecs
                           items={match.partner?.items || []}
                           specsMap={buildSpecsMap(match.partner)}
-                          quantitiesMap={buildQuantitiesMap(match.partner)}
                           quantitiesMap={buildQuantitiesMap(match.partner)}
                         />
                         <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
@@ -615,7 +612,6 @@ const DonationList = () => {
                       <ItemsWithSpecs
                         items={match.partner?.items || []}
                         specsMap={buildSpecsMap(match.partner)}
-                        quantitiesMap={buildQuantitiesMap(match.partner)}
                         quantitiesMap={buildQuantitiesMap(match.partner)}
                       />
                       <ThemedText style={styles.subtle}>School: {getSchoolDisplay(match.partner)}</ThemedText>
@@ -959,7 +955,6 @@ const styles = StyleSheet.create({
   itemSpecList: { marginTop: 4, gap: 2 },
   itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
-  itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
   paginationContainer: {

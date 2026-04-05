@@ -62,7 +62,6 @@ function ItemsWithSpecs({ items = [], specsMap = {}, quantitiesMap = {} }) {
       {items.map((item, idx) => {
         const spec = specsMap[item.toLowerCase()];
         const qty = quantitiesMap[item.toLowerCase()];
-        const qty = quantitiesMap[item.toLowerCase()];
         return (
           <View key={idx} style={styles.itemSpecRow}>
             <ThemedText style={styles.itemSpecItemName}>
@@ -542,7 +541,6 @@ const RequestList = () => {
           const filteredMatches = filterAndSortMatches(request);
           const mySpecsMap = buildSpecsMap(request);
           const myQuantitiesMap = buildQuantitiesMap(request);
-          const myQuantitiesMap = buildQuantitiesMap(request);
 
           const pendingMatch = filteredMatches.find((m) => m.status === "pending" && !m.partnerContact);
           const approvedMatch = filteredMatches.find(
@@ -618,7 +616,6 @@ const RequestList = () => {
                       items={completedMatch.items || []}
                       specsMap={buildSpecsMap(completedMatch.partner)}
                       quantitiesMap={buildQuantitiesMap(completedMatch.partner)}
-                      quantitiesMap={buildQuantitiesMap(completedMatch.partner)}
                     />
                     <ThemedText style={[styles.matchDetailLabel, { marginTop: 8 }]}>Donor School:</ThemedText>
                     <ThemedText style={styles.matchDetailText}>{getSchoolDisplay(completedMatch.partner)}</ThemedText>
@@ -655,7 +652,6 @@ const RequestList = () => {
                   <ItemsWithSpecs
                     items={pendingMatch.partner?.items || []}
                     specsMap={buildSpecsMap(pendingMatch.partner)}
-                    quantitiesMap={buildQuantitiesMap(pendingMatch.partner)}
                     quantitiesMap={buildQuantitiesMap(pendingMatch.partner)}
                   />
                   <ThemedText style={[styles.subtle, { marginTop: 4 }]}>
@@ -1066,7 +1062,6 @@ const styles = StyleSheet.create({
   itemSpecList: { marginTop: 4, gap: 2 },
   itemSpecRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
-  itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
 });
