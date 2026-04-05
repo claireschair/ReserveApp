@@ -6,9 +6,13 @@ import {
   signOut,
   onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
+  deleteUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   reload,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import {
   registerForPushNotificationsAsync,
   savePushTokenToUser,
@@ -67,8 +71,6 @@ export function UserProvider({ children }) {
   async function register(email, password, name, label, school) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     const uid = credential.user.uid;
-
-    // 1. Save to Firestore
     await setDoc(doc(db, "users", uid), {
       uid,
       name,
@@ -79,8 +81,6 @@ export function UserProvider({ children }) {
       notificationsEnabled: true,
       createdAt: Timestamp.now(),
     });
-
-    // 2. Send verification email BEFORE signing out (must be signed in)
     try {
       await sendEmailVerification(credential.user);
       console.log("Verification email sent to:", email);
@@ -88,12 +88,9 @@ export function UserProvider({ children }) {
       console.error("Failed to send verification email:", err.code, err.message);
       throw new Error("Account created but we couldn't send the verification email. Try logging in to resend.");
     }
-
-    // 3. Sign out AFTER email is sent
     await signOut(auth);
   }
 
-  // Called from the verify-email screen's Resend button
   async function resendVerificationEmail(email, password) {
     const credential = await signInWithEmailAndPassword(auth, email, password);
     await reload(credential.user);
@@ -110,11 +107,37 @@ export function UserProvider({ children }) {
     return { alreadyVerified: false };
   }
 
+  async function resetPassword(email) {
+    await sendPasswordResetEmail(auth, email);
+  }
   async function logout() {
     await signOut(auth);
     setUser(null);
   }
+  async function deleteAccount(password) {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) throw new Error("No user signed in.");
+    const uid = firebaseUser.uid;
+    try {
+      console.log("Step 1: Re-authenticating...");
+      const credential = EmailAuthProvider.credential(firebaseUser.email, password);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      const requestsRef = collection(db, "requests");
+      const batch = writeBatch(db);
+      const activeRequests = await getDocs(
+        query(requestsRef, where("userId", "==", uid), where("status", "==", "active"))
+      );
+      activeRequests.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+      await deleteDoc(doc(db, "users", uid));
+      await deleteUser(firebaseUser);
+      setUser(null);
 
+    } catch (err) {
+      console.error("deleteAccount failed:", err.code, err.message);
+      throw err;
+    }
+  }
   useEffect(() => {
     if (user?.uid) {
       setupPushNotifications();
@@ -133,7 +156,7 @@ export function UserProvider({ children }) {
   }
 
   return (
-    <UserContext.Provider value={{ user, authChecked, login, logout, register, resendVerificationEmail }}>
+    <UserContext.Provider value={{ user, authChecked, login, logout, register, resendVerificationEmail, resetPassword, deleteAccount }}>
       {children}
     </UserContext.Provider>
   );

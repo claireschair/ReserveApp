@@ -27,36 +27,19 @@ async function getZipCodeFromCoordinates(latitude, longitude) {
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
-      {
-        headers: {
-          'User-Agent': 'SchoolSupplyApp/1.0',
-        },
-      }
+      { headers: { "User-Agent": "SchoolSupplyApp/1.0" } }
     );
-
-    if (!response.ok) {
-      throw new Error('Geocoding request failed');
-    }
-
+    if (!response.ok) throw new Error("Geocoding request failed");
     const data = await response.json();
-
-    const zipCode =
-      data.address?.postcode ||
-      data.address?.postal_code ||
-      data.address?.zip_code;
-
+    const zipCode = data.address?.postcode || data.address?.postal_code || data.address?.zip_code;
     if (zipCode) {
-      const cleanZip = zipCode.replace(/[^\d-]/g, '');
+      const cleanZip = zipCode.replace(/[^\d-]/g, "");
       const match = cleanZip.match(/^(\d{5})(-\d{4})?$/);
-
-      if (match) {
-        return parseInt(match[1], 10);
-      }
+      if (match) return parseInt(match[1], 10);
     }
-
     return null;
   } catch (error) {
-    console.error('Error getting zip code from coordinates:', error);
+    console.error("Error getting zip code from coordinates:", error);
     return null;
   }
 }
@@ -64,9 +47,7 @@ async function getZipCodeFromCoordinates(latitude, longitude) {
 async function getUserData(userId) {
   try {
     const userDoc = await getDoc(doc(db, "users", userId));
-    if (userDoc.exists()) {
-      return userDoc.data();
-    }
+    if (userDoc.exists()) return userDoc.data();
     return null;
   } catch (error) {
     console.error("Error fetching user data:", error);
@@ -93,12 +74,10 @@ function calculateMatchScore(donation, request) {
   const donationItems = normalizeItems(donation.items);
   const requestItems = normalizeItems(request.items);
   const overlap = donationItems.filter((item) => requestItems.includes(item));
-
   if (overlap.length === 0) return null;
 
   let score = overlap.length;
   const completeness = overlap.length / requestItems.length;
-
   if (completeness === 1.0) score += 5;
   else if (completeness >= 0.75) score += 3;
   else if (completeness >= 0.5) score += 2;
@@ -107,12 +86,8 @@ function calculateMatchScore(donation, request) {
   let quantitySufficient = true;
   if (donation.quantities && request.quantities) {
     for (const item of overlap) {
-      const donationIdx = donation.items.findIndex(
-        (i) => i.toLowerCase() === item.toLowerCase()
-      );
-      const requestIdx = request.items.findIndex(
-        (i) => i.toLowerCase() === item.toLowerCase()
-      );
+      const donationIdx = donation.items.findIndex((i) => i.toLowerCase() === item.toLowerCase());
+      const requestIdx = request.items.findIndex((i) => i.toLowerCase() === item.toLowerCase());
       if (
         donationIdx !== -1 &&
         requestIdx !== -1 &&
@@ -150,12 +125,7 @@ function calculateMatchScore(donation, request) {
     else if (distance <= 30) score += 1;
   }
 
-  return {
-    score: Number(score.toFixed(2)),
-    overlap,
-    completeness,
-    quantitySufficient,
-  };
+  return { score: Number(score.toFixed(2)), overlap, completeness, quantitySufficient };
 }
 
 function isExpired(request) {
@@ -173,8 +143,17 @@ export function MatchProvider({ children }) {
   const { user } = useContext(UserContext);
   const userId = user?.uid ?? null;
 
-  async function saveRequest(type, items, locationData = {}, quantitiesObject = {}, itemSpecsObject = {}, isAutoResubmit = false) {
-    if (!userId) return null;
+  async function saveRequest(
+    type,
+    items,
+    locationData = {},
+    quantitiesObject = {},
+    itemSpecsObject = {},
+    isAutoResubmit = false,
+    overrideUserId = null
+  ) {
+    const targetUserId = overrideUserId || userId;
+    if (!targetUserId) return null;
 
     const quantities = items.map((item) => quantitiesObject[item] || 1);
     const specs = items.map((item) => itemSpecsObject[item] || "");
@@ -191,16 +170,14 @@ export function MatchProvider({ children }) {
     if (locationData.lat && locationData.lng && !locationData.zipCode) {
       try {
         const zipCode = await getZipCodeFromCoordinates(locationData.lat, locationData.lng);
-        if (zipCode) {
-          finalLocation.zipCode = zipCode;
-        }
+        if (zipCode) finalLocation.zipCode = zipCode;
       } catch (error) {
-        console.error('Failed to get zip code from coordinates:', error);
+        console.error("Failed to get zip code from coordinates:", error);
       }
     }
 
     const newRequest = await addDoc(collection(db, "requests"), {
-      userId,
+      userId: targetUserId,
       type,
       items,
       quantities,
@@ -209,7 +186,7 @@ export function MatchProvider({ children }) {
       status: "active",
       createdAt: Timestamp.now(),
       expiresAt: Timestamp.fromDate(expiresAt),
-      isAutoResubmit, // Mark if this was auto-created from leftover items
+      isAutoResubmit,
       match: {
         partnerId: null,
         partnerUserId: null,
@@ -226,40 +203,29 @@ export function MatchProvider({ children }) {
         where("type", "==", oppositeType),
         where("status", "==", "active")
       );
-
       const snapshot = await getDocs(q);
       const notifiedUsers = new Set();
 
       for (const docSnap of snapshot.docs) {
         const otherRequest = { id: docSnap.id, ...docSnap.data() };
-
-        if (otherRequest.userId === userId && !ALLOW_SELF_MATCHING) continue;
+        if (otherRequest.userId === targetUserId && !ALLOW_SELF_MATCHING) continue;
         if (isExpired(otherRequest)) continue;
 
         const donationDoc =
-          type === "donate"
-            ? { items, quantities, location: finalLocation }
-            : otherRequest;
+          type === "donate" ? { items, quantities, location: finalLocation } : otherRequest;
         const requestDoc =
-          type === "receive"
-            ? { items, quantities, location: finalLocation }
-            : otherRequest;
+          type === "receive" ? { items, quantities, location: finalLocation } : otherRequest;
 
         const matchResult = calculateMatchScore(donationDoc, requestDoc);
-
         if (matchResult && matchResult.score >= MIN_MATCH_SCORE) {
           if (!notifiedUsers.has(otherRequest.userId)) {
             const pushToken = await getUserPushToken(otherRequest.userId);
-
             if (pushToken) {
               await sendPushNotification(
                 pushToken,
-                "New Match Found!",
-                `A new ${type} matching your ${oppositeType} is available!`,
-                {
-                  type: "new_potential_match",
-                  screen: type === "donate" ? "RequestList" : "DonationList",
-                }
+                "New Match Found",
+                `A new ${type} matching your ${oppositeType} is available.`,
+                { type: "new_potential_match", screen: type === "donate" ? "RequestList" : "DonationList" }
               );
               notifiedUsers.add(otherRequest.userId);
             }
@@ -283,73 +249,229 @@ export function MatchProvider({ children }) {
     return saveRequest("receive", allItems, locationData, quantitiesObject, itemSpecsObject, false);
   }
 
-  /**
-   * Calculate leftover items after a match completion
-   * Returns { donorLeftovers, requestorLeftovers } with items, quantities, specs
-   */
-  function calculateLeftoverItems(donorRequest, requestorRequest, matchedItems) {
-    const normalizeForComparison = (str) => str.toLowerCase().trim();
-    const matchedNormalized = matchedItems.map(normalizeForComparison);
+  function buildResubmitObjects(request) {
+    const quantitiesObject = {};
+    const specsObject = {};
+    request.items.forEach((item, idx) => {
+      quantitiesObject[item] = request.quantities?.[idx] || 1;
+      if (request.specs?.[idx]) specsObject[item] = request.specs[idx];
+    });
+    return { quantitiesObject, specsObject };
+  }
 
-    // Helper to filter out matched items and preserve parallel arrays
-    const getLeftovers = (request) => {
-      const leftoverIndices = [];
-      
+  function buildSpecsMap(requestDoc) {
+    const map = {};
+    if (!requestDoc?.items || !requestDoc?.specs) return map;
+    requestDoc.items.forEach((item, idx) => {
+      const spec = requestDoc.specs[idx];
+      if (spec) map[item.toLowerCase()] = spec;
+    });
+    return map;
+  }
+
+  function calculateLeftoverItems(donorRequest, requestorRequest, exchangedQuantities) {
+    // exchangedQuantities: { itemNameLower: quantityActuallyExchanged }
+    // Items not present in exchangedQuantities were not exchanged at all.
+
+    const getLeftovers = (request, role) => {
+      const leftoverItems = [];
+      const leftoverQuantities = [];
+      const leftoverSpecs = [];
+
       request.items.forEach((item, idx) => {
-        if (!matchedNormalized.includes(normalizeForComparison(item))) {
-          leftoverIndices.push(idx);
+        const key = item.toLowerCase().trim();
+        const originalQty = request.quantities?.[idx] || 1;
+        const spec = request.specs?.[idx] || "";
+
+        if (!(key in exchangedQuantities)) {
+          // Item was not exchanged at all — resubmit full quantity
+          leftoverItems.push(item);
+          leftoverQuantities.push(originalQty);
+          leftoverSpecs.push(spec);
+        } else {
+          const exchangedQty = exchangedQuantities[key];
+          if (role === "donor") {
+            // Donor resubmits however many they had beyond what was taken
+            const remaining = originalQty - exchangedQty;
+            if (remaining > 0) {
+              leftoverItems.push(item);
+              leftoverQuantities.push(remaining);
+              leftoverSpecs.push(spec);
+            }
+          } else {
+            // Requestor resubmits however many they still need
+            const requestedQty = originalQty;
+            const remaining = requestedQty - exchangedQty;
+            if (remaining > 0) {
+              leftoverItems.push(item);
+              leftoverQuantities.push(remaining);
+              leftoverSpecs.push(spec);
+            }
+          }
         }
       });
 
-      if (leftoverIndices.length === 0) return null;
-
-      return {
-        items: leftoverIndices.map(idx => request.items[idx]),
-        quantities: leftoverIndices.map(idx => request.quantities?.[idx] || 1),
-        specs: leftoverIndices.map(idx => request.specs?.[idx] || ""),
-      };
+      if (leftoverItems.length === 0) return null;
+      return { items: leftoverItems, quantities: leftoverQuantities, specs: leftoverSpecs };
     };
 
     return {
-      donorLeftovers: getLeftovers(donorRequest),
-      requestorLeftovers: getLeftovers(requestorRequest),
+      donorLeftovers: getLeftovers(donorRequest, "donor"),
+      requestorLeftovers: getLeftovers(requestorRequest, "requestor"),
     };
   }
 
-  /**
-   * Resubmit leftover items as new active requests
-   */
-  async function resubmitLeftoverItems(userId, type, leftoverData, location) {
+  async function resubmitLeftoverItems(targetUserId, type, leftoverData, location) {
     if (!leftoverData || leftoverData.items.length === 0) return null;
-
-    // Build quantities and specs objects from arrays
     const quantitiesObject = {};
     const specsObject = {};
-    
     leftoverData.items.forEach((item, idx) => {
       quantitiesObject[item] = leftoverData.quantities[idx];
-      if (leftoverData.specs[idx]) {
-        specsObject[item] = leftoverData.specs[idx];
-      }
+      if (leftoverData.specs[idx]) specsObject[item] = leftoverData.specs[idx];
     });
-
-    // Create new request with leftover items
-    const result = await saveRequest(
-      type,
-      leftoverData.items,
-      location,
-      quantitiesObject,
-      specsObject,
-      true // Mark as auto-resubmit
-    );
-
-    return result;
+    return saveRequest(type, leftoverData.items, location, quantitiesObject, specsObject, true, targetUserId);
   }
 
-  /**
-   * Resubmit all items from a request after reporting
-   * This recreates the entire form for the reporter (NOT a completion)
-   */
+  async function resubmitAllItems(targetUserId, type, request) {
+    const { quantitiesObject, specsObject } = buildResubmitObjects(request);
+    return saveRequest(type, request.items, request.location, quantitiesObject, specsObject, true, targetUserId);
+  }
+
+  function buildCompletionMessage(completionType, resubmitted, leftoverCount, type) {
+    const noun = type === "donate" ? "donation" : "request";
+    if (completionType === "complete") {
+      if (resubmitted) {
+        return {
+          title: "Match Completed",
+          body: `Your match is complete. A new ${noun} was created with your ${leftoverCount} remaining item(s).`,
+        };
+      }
+      return { title: "Match Completed", body: "Your match was successfully completed." };
+    }
+    if (completionType === "partial") {
+      if (resubmitted) {
+        return {
+          title: "Partial Exchange Recorded",
+          body: `Match closed. A new ${noun} was created with your ${leftoverCount} unexchanged item(s).`,
+        };
+      }
+      return { title: "Partial Exchange Recorded", body: "Match closed. All your items were exchanged." };
+    }
+    if (completionType === "nocoordination") {
+      return {
+        title: "Match Closed",
+        body: `Could not coordinate. A new ${noun} was created with all your item(s) so you can find a new match.`,
+      };
+    }
+    return { title: "Match Closed", body: "Your match has been closed." };
+  }
+
+  async function completeMatch(requestId, chatId = null, completionType = "complete", exchangedQuantities = {}) {
+    if (!userId) return null;
+
+    try {
+      const requestDoc = await getDoc(doc(db, "requests", requestId));
+      if (!requestDoc.exists()) throw new Error("Request not found.");
+
+      const request = { id: requestDoc.id, ...requestDoc.data() };
+      const partnerId = request.match?.partnerId;
+
+      if (!partnerId) {
+        await updateDoc(doc(db, "requests", requestId), {
+          status: "completed",
+          completedAt: Timestamp.now(),
+          completionType,
+          "match.chatId": chatId,
+        });
+        return true;
+      }
+
+      const partnerDoc = await getDoc(doc(db, "requests", partnerId));
+      if (!partnerDoc.exists()) throw new Error("Partner request not found.");
+
+      const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
+      const isDonor = request.type === "donate";
+      const donorRequest = isDonor ? request : partnerRequest;
+      const requestorRequest = isDonor ? partnerRequest : request;
+
+      await updateDoc(doc(db, "requests", requestId), {
+        status: "completed",
+        completedAt: Timestamp.now(),
+        completionType,
+        completedBy: userId,
+        "match.chatId": chatId,
+      });
+
+      await updateDoc(doc(db, "requests", partnerId), {
+        status: "completed",
+        completedAt: Timestamp.now(),
+        completionType,
+        completedBy: userId,
+        "match.chatId": chatId,
+      });
+
+      let donorResubmitted = false;
+      let requestorResubmitted = false;
+      let donorLeftoverCount = 0;
+      let requestorLeftoverCount = 0;
+
+      if (completionType === "complete" || completionType === "partial") {
+        // For "complete", exchangedQuantities reflects full matched amounts.
+        // For "partial", exchangedQuantities reflects what was actually handed over.
+        // calculateLeftoverItems uses this to figure out remainders for both sides.
+        const { donorLeftovers, requestorLeftovers } = calculateLeftoverItems(
+          donorRequest,
+          requestorRequest,
+          exchangedQuantities
+        );
+
+        if (donorLeftovers) {
+          await resubmitLeftoverItems(donorRequest.userId, "donate", donorLeftovers, donorRequest.location);
+          donorResubmitted = true;
+          donorLeftoverCount = donorLeftovers.items.length;
+        }
+
+        if (requestorLeftovers) {
+          await resubmitLeftoverItems(requestorRequest.userId, "receive", requestorLeftovers, requestorRequest.location);
+          requestorResubmitted = true;
+          requestorLeftoverCount = requestorLeftovers.items.length;
+        }
+      } else if (completionType === "nocoordination") {
+        await resubmitAllItems(donorRequest.userId, "donate", donorRequest);
+        await resubmitAllItems(requestorRequest.userId, "receive", requestorRequest);
+        donorResubmitted = true;
+        requestorResubmitted = true;
+        donorLeftoverCount = donorRequest.items.length;
+        requestorLeftoverCount = requestorRequest.items.length;
+      }
+
+      const donorPushToken = await getUserPushToken(donorRequest.userId);
+      if (donorPushToken) {
+        const msg = buildCompletionMessage(completionType, donorResubmitted, donorLeftoverCount, "donate");
+        await sendPushNotification(donorPushToken, msg.title, msg.body, { type: "match_completed" });
+      }
+
+      const requestorPushToken = await getUserPushToken(requestorRequest.userId);
+      if (requestorPushToken) {
+        const msg = buildCompletionMessage(completionType, requestorResubmitted, requestorLeftoverCount, "receive");
+        await sendPushNotification(requestorPushToken, msg.title, msg.body, { type: "match_completed" });
+      }
+
+      return {
+        completed: true,
+        completionType,
+        donorResubmitted,
+        requestorResubmitted,
+        donorLeftoverCount,
+        requestorLeftoverCount,
+        isDonor,
+      };
+    } catch (error) {
+      console.error("Error completing match:", error);
+      throw error;
+    }
+  }
+
   async function resubmitAfterReport(requestId) {
     if (!userId) return null;
 
@@ -358,37 +480,20 @@ export function MatchProvider({ children }) {
       if (!requestDoc.exists()) throw new Error("Request not found.");
 
       const request = { id: requestDoc.id, ...requestDoc.data() };
-      
-      // Only resubmit for the person who is reporting (not being reported)
-      if (request.userId !== userId) {
-        return null;
-      }
+      if (request.userId !== userId) return null;
 
-      // Get partner request to close it too
       const partnerId = request.match?.partnerId;
+      const { quantitiesObject, specsObject } = buildResubmitObjects(request);
 
-      // Build quantities and specs objects from arrays
-      const quantitiesObject = {};
-      const specsObject = {};
-      
-      request.items.forEach((item, idx) => {
-        quantitiesObject[item] = request.quantities[idx];
-        if (request.specs[idx]) {
-          specsObject[item] = request.specs[idx];
-        }
-      });
-
-      // Create new request with ALL items (not just leftovers)
       const result = await saveRequest(
         request.type,
         request.items,
         request.location,
         quantitiesObject,
         specsObject,
-        false // Not an auto-resubmit
+        false
       );
 
-      // Mark the original requests as completed (not the match itself)
       await updateDoc(doc(db, "requests", requestId), {
         status: "completed",
         completedAt: Timestamp.now(),
@@ -403,13 +508,12 @@ export function MatchProvider({ children }) {
         });
       }
 
-      // Send notification
       const pushToken = await getUserPushToken(userId);
       if (pushToken) {
         await sendPushNotification(
           pushToken,
-          "Your Items Have Been Resubmitted",
-          `We've created a new ${request.type === "donate" ? "donation" : "request"} with all your items. You can find new matches!`,
+          "Items Resubmitted",
+          `A new ${request.type === "donate" ? "donation" : "request"} was created with all your items.`,
           { type: "report_resubmit" }
         );
       }
@@ -421,146 +525,6 @@ export function MatchProvider({ children }) {
     }
   }
 
-  async function completeMatch(requestId, chatId = null) {
-    if (!userId) return null;
-
-    try {
-      // Get both request documents
-      const requestDoc = await getDoc(doc(db, "requests", requestId));
-      if (!requestDoc.exists()) throw new Error("Request not found.");
-
-      const request = { id: requestDoc.id, ...requestDoc.data() };
-      const partnerId = request.match?.partnerId;
-
-      if (!partnerId) {
-        // No partner, just complete the single request
-        await updateDoc(doc(db, "requests", requestId), { 
-          status: "completed",
-          completedAt: Timestamp.now(),
-          "match.chatId": chatId,
-        });
-        return true;
-      }
-
-      // Get partner request
-      const partnerDoc = await getDoc(doc(db, "requests", partnerId));
-      if (!partnerDoc.exists()) throw new Error("Partner request not found.");
-      
-      const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
-
-      // Determine which is donor and which is requestor
-      const isDonor = request.type === "donate";
-      const donorRequest = isDonor ? request : partnerRequest;
-      const requestorRequest = isDonor ? partnerRequest : request;
-
-      // Calculate matched items (these are the items that were actually exchanged)
-      const matchResult = calculateMatchScore(donorRequest, requestorRequest);
-      const matchedItems = matchResult?.overlap || [];
-
-      // Calculate leftover items
-      const { donorLeftovers, requestorLeftovers } = calculateLeftoverItems(
-        donorRequest,
-        requestorRequest,
-        matchedItems
-      );
-
-      // Mark both requests as completed
-      await updateDoc(doc(db, "requests", requestId), { 
-        status: "completed",
-        completedAt: Timestamp.now(),
-        "match.chatId": chatId,
-        completedBy: userId, // Track who completed it
-      });
-
-      await updateDoc(doc(db, "requests", partnerId), { 
-        status: "completed",
-        completedAt: Timestamp.now(),
-        "match.chatId": chatId,
-        completedBy: userId, // Track who completed it
-      });
-
-      // Resubmit leftover items for donor
-      let donorResubmitted = false;
-      if (donorLeftovers) {
-        await resubmitLeftoverItems(
-          donorRequest.userId,
-          "donate",
-          donorLeftovers,
-          donorRequest.location
-        );
-        donorResubmitted = true;
-      }
-
-      // Resubmit leftover items for requestor
-      let requestorResubmitted = false;
-      if (requestorLeftovers) {
-        await resubmitLeftoverItems(
-          requestorRequest.userId,
-          "receive",
-          requestorLeftovers,
-          requestorRequest.location
-        );
-        requestorResubmitted = true;
-      }
-
-      // Send notifications to BOTH users about completion and resubmissions
-      // Notify donor
-      const donorPushToken = await getUserPushToken(donorRequest.userId);
-      if (donorPushToken) {
-        if (donorResubmitted) {
-          await sendPushNotification(
-            donorPushToken,
-            "Match Completed! ♻️",
-            `Your match was completed. We automatically created a new donation with your ${donorLeftovers.items.length} leftover item(s).`,
-            { type: "match_completed_with_resubmit" }
-          );
-        } else {
-          await sendPushNotification(
-            donorPushToken,
-            "Match Completed!",
-            "Your match was successfully completed. Thank you for donating!",
-            { type: "match_completed" }
-          );
-        }
-      }
-
-      // Notify requestor
-      const requestorPushToken = await getUserPushToken(requestorRequest.userId);
-      if (requestorPushToken) {
-        if (requestorResubmitted) {
-          await sendPushNotification(
-            requestorPushToken,
-            "Match Completed! ♻️",
-            `Your match was completed. We automatically created a new request with your ${requestorLeftovers.items.length} leftover item(s).`,
-            { type: "match_completed_with_resubmit" }
-          );
-        } else {
-          await sendPushNotification(
-            requestorPushToken,
-            "Match Completed!",
-            "Your match was successfully completed. Thank you!",
-            { type: "match_completed" }
-          );
-        }
-      }
-
-      return {
-        completed: true,
-        donorResubmitted,
-        requestorResubmitted,
-        donorLeftoverCount: donorLeftovers?.items.length || 0,
-        requestorLeftoverCount: requestorLeftovers?.items.length || 0,
-        isDonor, // Return this so we know which type the caller is
-      };
-
-    } catch (error) {
-      console.error("Error completing match:", error);
-      throw error;
-    }
-  }
-
-  // ... rest of the functions remain the same (cleanupExpiredAndTimedOut, getRequestsWithMatches, etc.)
-  
   async function cleanupExpiredAndTimedOut() {
     try {
       const q = query(collection(db, "requests"));
@@ -579,26 +543,19 @@ export function MatchProvider({ children }) {
           try {
             const userPushToken = await getUserPushToken(req.userId);
             if (userPushToken) {
-              await sendPushNotification(
-                userPushToken,
-                "Match Expired",
-                "Your pending match has timed out.",
-                { type: "match_timeout" }
-              );
+              await sendPushNotification(userPushToken, "Match Expired", "Your pending match has timed out.", {
+                type: "match_timeout",
+              });
             }
-
             if (partnerId) {
               const partnerDoc = await getDoc(doc(db, "requests", partnerId));
               if (partnerDoc.exists()) {
                 const partnerUserId = partnerDoc.data().userId;
                 const partnerPushToken = await getUserPushToken(partnerUserId);
                 if (partnerPushToken) {
-                  await sendPushNotification(
-                    partnerPushToken,
-                    "Match Expired",
-                    "A pending match has timed out.",
-                    { type: "match_timeout" }
-                  );
+                  await sendPushNotification(partnerPushToken, "Match Expired", "A pending match has timed out.", {
+                    type: "match_timeout",
+                  });
                 }
               }
             }
@@ -645,16 +602,10 @@ export function MatchProvider({ children }) {
         where("userId", "==", userId),
         where("type", "==", type)
       );
-
       const snapshot = await getDocs(q);
       const userRequests = snapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter(
-          (r) =>
-            r.status === "active" ||
-            r.status === "pending" ||
-            r.status === "matched"
-        );
+        .filter((r) => r.status === "active" || r.status === "pending" || r.status === "matched");
 
       const oppositeType = type === "donate" ? "receive" : "donate";
       const oppQuery = query(
@@ -662,12 +613,8 @@ export function MatchProvider({ children }) {
         where("type", "==", oppositeType),
         where("status", "==", "active")
       );
-
       const oppSnapshot = await getDocs(oppQuery);
-      const oppositeRequests = oppSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const oppositeRequests = oppSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       const enriched = [];
 
@@ -678,13 +625,10 @@ export function MatchProvider({ children }) {
         let hasPendingMatch = false;
 
         if (request.match?.partnerId) {
-          const partnerDoc = await getDoc(
-            doc(db, "requests", request.match.partnerId)
-          );
+          const partnerDoc = await getDoc(doc(db, "requests", request.match.partnerId));
           if (partnerDoc.exists()) {
             const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
             const partnerUserData = await getUserData(partnerRequest.userId);
-
             const partner = {
               ...partnerRequest,
               school: partnerUserData?.school || null,
@@ -694,7 +638,6 @@ export function MatchProvider({ children }) {
             const donationDoc = type === "donate" ? request : partner;
             const receiveDoc = type === "receive" ? request : partner;
             const matchResult = calculateMatchScore(donationDoc, receiveDoc);
-
             const partnerContact = partner.match?.myContact || request.match.partnerContact;
 
             matches.push({
@@ -706,15 +649,11 @@ export function MatchProvider({ children }) {
               quantitySufficient: matchResult?.quantitySufficient || false,
               status: request.status,
               myContact: request.match.myContact,
-              partnerContact: partnerContact,
-              donorSpecs: buildSpecsMap(
-                type === "donate" ? request : partner
-              ),
+              partnerContact,
+              donorSpecs: buildSpecsMap(type === "donate" ? request : partner),
             });
 
-            if (request.status === "pending") {
-              hasPendingMatch = true;
-            }
+            if (request.status === "pending") hasPendingMatch = true;
           }
         }
 
@@ -745,9 +684,7 @@ export function MatchProvider({ children }) {
                 status: null,
                 myContact: null,
                 partnerContact: null,
-                donorSpecs: buildSpecsMap(
-                  type === "donate" ? request : enrichedOppRequest
-                ),
+                donorSpecs: buildSpecsMap(type === "donate" ? request : enrichedOppRequest),
                 _isTemporary: true,
               });
             }
@@ -755,12 +692,7 @@ export function MatchProvider({ children }) {
         }
 
         matches.sort((a, b) => (b.score || 0) - (a.score || 0));
-
-        enriched.push({
-          ...request,
-          matches: matches.slice(0, 10),
-          hasPendingMatch,
-        });
+        enriched.push({ ...request, matches: matches.slice(0, 10), hasPendingMatch });
       }
 
       return enriched;
@@ -768,16 +700,6 @@ export function MatchProvider({ children }) {
       console.error("Error in getRequestsWithMatches:", err);
       return [];
     }
-  }
-
-  function buildSpecsMap(requestDoc) {
-    const map = {};
-    if (!requestDoc?.items || !requestDoc?.specs) return map;
-    requestDoc.items.forEach((item, idx) => {
-      const spec = requestDoc.specs[idx];
-      if (spec) map[item.toLowerCase()] = spec;
-    });
-    return map;
   }
 
   async function getDonationsWithMatches() {
@@ -790,7 +712,7 @@ export function MatchProvider({ children }) {
 
   async function getCompletedMatches(type) {
     if (!userId) return [];
-    
+
     try {
       const q = query(
         collection(db, "requests"),
@@ -798,48 +720,33 @@ export function MatchProvider({ children }) {
         where("type", "==", type),
         where("status", "==", "completed")
       );
-      
       const snapshot = await getDocs(q);
       const completed = [];
-      
+
       for (const docSnap of snapshot.docs) {
         const request = { id: docSnap.id, ...docSnap.data() };
-        
         if (request.match?.partnerId) {
           const partnerDoc = await getDoc(doc(db, "requests", request.match.partnerId));
           if (partnerDoc.exists()) {
             const partnerRequest = { id: partnerDoc.id, ...partnerDoc.data() };
             const partnerUserData = await getUserData(partnerRequest.userId);
-            
             const partner = {
               ...partnerRequest,
               school: partnerUserData?.school || null,
               name: partnerUserData?.name || "Unknown",
             };
-            
             const donationDoc = type === "donate" ? request : partner;
             const receiveDoc = type === "receive" ? request : partner;
             const matchResult = calculateMatchScore(donationDoc, receiveDoc);
-            
             completed.push({
               ...request,
-              match: {
-                ...request.match,
-                partner,
-                items: matchResult?.overlap || [],
-                score: matchResult?.score || 0,
-              }
+              match: { ...request.match, partner, items: matchResult?.overlap || [], score: matchResult?.score || 0 },
             });
           }
         }
       }
-      
-      completed.sort((a, b) => {
-        const aTime = a.completedAt?.seconds || 0;
-        const bTime = b.completedAt?.seconds || 0;
-        return bTime - aTime;
-      });
-      
+
+      completed.sort((a, b) => (b.completedAt?.seconds || 0) - (a.completedAt?.seconds || 0));
       return completed;
     } catch (err) {
       console.error("Error fetching completed matches:", err);
@@ -852,16 +759,12 @@ export function MatchProvider({ children }) {
 
     const theirDoc = await getDoc(doc(db, "requests", theirRequest.id));
     if (!theirDoc.exists() || theirDoc.data().status !== "active") {
-      throw new Error(
-        "This request was just matched by someone else. Please try a different match."
-      );
+      throw new Error("This request was just matched by someone else. Please try a different match.");
     }
 
     const myDoc = await getDoc(doc(db, "requests", myRequest.id));
     if (myDoc.data().match?.partnerId) {
-      throw new Error(
-        "You already have a pending match. Cancel it first or wait for approval."
-      );
+      throw new Error("You already have a pending match. Cancel it first or wait for approval.");
     }
 
     await updateDoc(doc(db, "requests", myRequest.id), {
@@ -883,7 +786,7 @@ export function MatchProvider({ children }) {
       if (pushToken) {
         await sendPushNotification(
           pushToken,
-          "New Match Request!",
+          "New Match Request",
           `Someone has selected your ${theirRequest.type}. Review and approve.`,
           { type: "new_match_request" }
         );
@@ -902,10 +805,8 @@ export function MatchProvider({ children }) {
     if (!requestDoc.exists()) throw new Error("Request not found.");
 
     const request = requestDoc.data();
-    if (request.userId !== userId)
-      throw new Error("You can only cancel your own matches.");
-    if (request.status !== "pending")
-      throw new Error("This match is not pending.");
+    if (request.userId !== userId) throw new Error("You can only cancel your own matches.");
+    if (request.status !== "pending") throw new Error("This match is not pending.");
 
     const partnerId = request.match?.partnerId;
 
@@ -934,12 +835,9 @@ export function MatchProvider({ children }) {
           const partnerUserId = partnerDoc.data().userId;
           const pushToken = await getUserPushToken(partnerUserId);
           if (pushToken) {
-            await sendPushNotification(
-              pushToken,
-              "Match Cancelled",
-              "The other user cancelled their match request.",
-              { type: "match_cancelled" }
-            );
+            await sendPushNotification(pushToken, "Match Cancelled", "The other user cancelled their match request.", {
+              type: "match_cancelled",
+            });
           }
         }
       } catch (err) {
@@ -957,18 +855,14 @@ export function MatchProvider({ children }) {
     if (!requestDoc.exists()) throw new Error("Request not found.");
 
     const request = requestDoc.data();
-    if (request.userId !== userId)
-      throw new Error("You can only approve your own requests.");
-    if (request.status !== "pending")
-      throw new Error("This match is not pending.");
+    if (request.userId !== userId) throw new Error("You can only approve your own requests.");
+    if (request.status !== "pending") throw new Error("This match is not pending.");
 
     const partnerId = request.match?.partnerId;
     if (!partnerId) throw new Error("No partner found for this match.");
 
     await updateDoc(doc(db, "requests", requestId), {
-      "match.myContact": {
-        email: contactInfo.email,
-      },
+      "match.myContact": { email: contactInfo.email },
     });
 
     try {
@@ -979,7 +873,7 @@ export function MatchProvider({ children }) {
         if (pushToken) {
           await sendPushNotification(
             pushToken,
-            "Match Approved!",
+            "Match Approved",
             "Your match request was approved. Provide your contact info to complete.",
             { type: "match_approved" }
           );
@@ -999,10 +893,8 @@ export function MatchProvider({ children }) {
     if (!requestDoc.exists()) throw new Error("Request not found.");
 
     const request = requestDoc.data();
-    if (request.userId !== userId)
-      throw new Error("You can only deny your own requests.");
-    if (request.status !== "pending")
-      throw new Error("This match is not pending.");
+    if (request.userId !== userId) throw new Error("You can only deny your own requests.");
+    if (request.status !== "pending") throw new Error("This match is not pending.");
 
     const partnerId = request.match?.partnerId;
 
@@ -1054,8 +946,7 @@ export function MatchProvider({ children }) {
     if (!requestDoc.exists()) throw new Error("Request not found.");
 
     const request = requestDoc.data();
-    if (request.userId !== userId)
-      throw new Error("You can only update your own contact info.");
+    if (request.userId !== userId) throw new Error("You can only update your own contact info.");
 
     const partnerId = request.match?.partnerId;
     if (!partnerId) throw new Error("No matched request found.");
@@ -1064,35 +955,27 @@ export function MatchProvider({ children }) {
     if (!partnerDoc.exists()) throw new Error("Matched request not found.");
 
     const partner = partnerDoc.data();
-
     if (!partner.match?.myContact) {
-      throw new Error("The donor hasn't approved yet or hasn't provided contact info.");
+      throw new Error("The donor has not approved yet or has not provided contact info.");
     }
 
     await updateDoc(doc(db, "requests", requestId), {
       status: "matched",
-      "match.myContact": {
-        email: contactInfo.email,
-      },
+      "match.myContact": { email: contactInfo.email },
       "match.partnerContact": partner.match.myContact,
     });
 
     await updateDoc(doc(db, "requests", partnerId), {
       status: "matched",
-      "match.partnerContact": {
-        email: contactInfo.email,
-      },
+      "match.partnerContact": { email: contactInfo.email },
     });
 
     try {
       const pushToken = await getUserPushToken(partner.userId);
       if (pushToken) {
-        await sendPushNotification(
-          pushToken,
-          "Match Complete!",
-          "Contact info exchanged! You can now coordinate pickup.",
-          { type: "contact_provided" }
-        );
+        await sendPushNotification(pushToken, "Match Complete", "Contact info exchanged. You can now coordinate pickup.", {
+          type: "contact_provided",
+        });
       }
     } catch (err) {
       console.error("Error sending notification:", err);
@@ -1108,11 +991,9 @@ export function MatchProvider({ children }) {
     if (!requestDoc.exists()) throw new Error("Request not found.");
 
     const request = requestDoc.data();
-    if (request.userId !== userId)
-      throw new Error("You can only delete your own requests.");
+    if (request.userId !== userId) throw new Error("You can only delete your own requests.");
 
     const partnerId = request.match?.partnerId;
-
     if (partnerId) {
       await updateDoc(doc(db, "requests", partnerId), {
         status: "active",
@@ -1125,25 +1006,18 @@ export function MatchProvider({ children }) {
     }
 
     await updateDoc(doc(db, "requests", requestId), { status: "deleted" });
-
     return true;
   }
 
   function subscribeToRequest(requestId, callback) {
     if (!requestId) return () => {};
-
     const unsubscribe = onSnapshot(
       doc(db, "requests", requestId),
       (docSnap) => {
-        if (docSnap.exists()) {
-          callback({ id: docSnap.id, ...docSnap.data() });
-        }
+        if (docSnap.exists()) callback({ id: docSnap.id, ...docSnap.data() });
       },
-      (error) => {
-        console.error("Error listening to request:", error);
-      }
+      (error) => { console.error("Error listening to request:", error); }
     );
-
     return unsubscribe;
   }
 
@@ -1154,17 +1028,14 @@ export function MatchProvider({ children }) {
         where("status", "==", "completed"),
         where("type", "==", "donate")
       );
-
       const snapshot = await getDocs(requestsQuery);
-      const completedDonations = snapshot.docs.map(doc => doc.data());
+      const completedDonations = snapshot.docs.map((doc) => doc.data());
 
       let totalItemsDistributed = 0;
-
-      completedDonations.forEach(donation => {
+      completedDonations.forEach((donation) => {
         if (donation.items && donation.quantities) {
           donation.items.forEach((item, index) => {
-            const quantity = donation.quantities[index] || 1;
-            totalItemsDistributed += quantity;
+            totalItemsDistributed += donation.quantities[index] || 1;
           });
         }
       });
@@ -1173,41 +1044,32 @@ export function MatchProvider({ children }) {
         collection(db, "requests"),
         where("status", "in", ["active", "pending", "matched"])
       );
-
       const activeSnapshot = await getDocs(activeQuery);
-      const activeRequests = activeSnapshot.docs.map(doc => doc.data());
-
-      const donations = activeRequests.filter(r => r.type === "donate");
-      const receives = activeRequests.filter(r => r.type === "receive");
-
+      const activeRequests = activeSnapshot.docs.map((doc) => doc.data());
+      const donations = activeRequests.filter((r) => r.type === "donate");
+      const receives = activeRequests.filter((r) => r.type === "receive");
       const itemCounts = { donated: {}, requested: {} };
 
-      donations.forEach(donation => {
+      donations.forEach((donation) => {
         donation.items?.forEach((item, index) => {
-          const normalizedItem = item.toLowerCase();
-          const quantity = donation.quantities?.[index] || 1;
-          itemCounts.donated[normalizedItem] = (itemCounts.donated[normalizedItem] || 0) + quantity;
+          const key = item.toLowerCase();
+          itemCounts.donated[key] = (itemCounts.donated[key] || 0) + (donation.quantities?.[index] || 1);
         });
       });
 
-      receives.forEach(receive => {
+      receives.forEach((receive) => {
         receive.items?.forEach((item, index) => {
-          const normalizedItem = item.toLowerCase();
-          const quantity = receive.quantities?.[index] || 1;
-          itemCounts.requested[normalizedItem] = (itemCounts.requested[normalizedItem] || 0) + quantity;
+          const key = item.toLowerCase();
+          itemCounts.requested[key] = (itemCounts.requested[key] || 0) + (receive.quantities?.[index] || 1);
         });
       });
 
-      const allItems = new Set([
-        ...Object.keys(itemCounts.donated),
-        ...Object.keys(itemCounts.requested)
-      ]);
-
-      const stats = Array.from(allItems).map(item => ({
+      const allItems = new Set([...Object.keys(itemCounts.donated), ...Object.keys(itemCounts.requested)]);
+      const stats = Array.from(allItems).map((item) => ({
         item,
         donated: itemCounts.donated[item] || 0,
         requested: itemCounts.requested[item] || 0,
-        gap: (itemCounts.requested[item] || 0) - (itemCounts.donated[item] || 0)
+        gap: (itemCounts.requested[item] || 0) - (itemCounts.donated[item] || 0),
       }));
 
       return {
@@ -1215,25 +1077,12 @@ export function MatchProvider({ children }) {
         totalRequests: receives.length,
         totalItemsDistributed,
         itemStats: stats,
-        topNeeded: stats
-          .filter(s => s.gap > 0)
-          .sort((a, b) => b.gap - a.gap)
-          .slice(0, 10),
-        topSurplus: stats
-          .filter(s => s.gap < 0)
-          .sort((a, b) => a.gap - b.gap)
-          .slice(0, 10)
+        topNeeded: stats.filter((s) => s.gap > 0).sort((a, b) => b.gap - a.gap).slice(0, 10),
+        topSurplus: stats.filter((s) => s.gap < 0).sort((a, b) => a.gap - b.gap).slice(0, 10),
       };
     } catch (error) {
       console.error("Error getting supply stats:", error);
-      return {
-        totalDonations: 0,
-        totalRequests: 0,
-        totalItemsDistributed: 0,
-        itemStats: [],
-        topNeeded: [],
-        topSurplus: []
-      };
+      return { totalDonations: 0, totalRequests: 0, totalItemsDistributed: 0, itemStats: [], topNeeded: [], topSurplus: [] };
     }
   }
 
@@ -1265,17 +1114,8 @@ export function MatchProvider({ children }) {
 }
 
 export function getLocationDisplay(locationData) {
-  if (!locationData) {
-    return "Not provided";
-  }
-
-  if (locationData.zipCode) {
-    return `Zip ${locationData.zipCode}`;
-  }
-
-  if (locationData.lat && locationData.lng) {
-    return `Location provided`;
-  }
-
+  if (!locationData) return "Not provided";
+  if (locationData.zipCode) return `Zip ${locationData.zipCode}`;
+  if (locationData.lat && locationData.lng) return "Location provided";
   return "Not provided";
 }
