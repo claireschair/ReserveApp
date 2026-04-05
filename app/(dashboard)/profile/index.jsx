@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     width: "100%",
-    height: "30%",
+    height: "20%",
     backgroundColor: "#4A90E2",
     zIndex: 0,
   },
@@ -572,7 +572,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
   },
-<<<<<<< HEAD
   impactSection: {
     width: '90%',
     alignSelf: 'center',
@@ -622,7 +621,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
     color: '#555',
   },
-=======
   modalOverlay: {
   flex: 1,
   backgroundColor: 'rgba(0,0,0,0.5)',
@@ -717,5 +715,4 @@ modalDeleteText: {
   fontWeight: '600',
   fontSize: 15,
 },
->>>>>>> db1e4852413b40f32f067c8fd1996394beaba3bc
 });

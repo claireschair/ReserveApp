@@ -399,14 +399,10 @@ const ChatScreen = () => {
 export default ChatScreen;
 
 const styles = StyleSheet.create({
-<<<<<<< HEAD
   container: {
     flex: 1,
     backgroundColor: "#F3F6FB", 
   },
-=======
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
->>>>>>> db1e4852413b40f32f067c8fd1996394beaba3bc
   header: {
     paddingTop: 60,
     flexDirection: "row",
@@ -430,7 +426,6 @@ const styles = StyleSheet.create({
     width:60,
     alignItems: "flex-end",
   },
-<<<<<<< HEAD
   backButton: {
     color: "#4A90E2",
     fontSize: 16,
@@ -465,11 +460,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-=======
-  backButton: { color: "#4A90E2", fontSize: 16 },
-  headerTitle: { fontSize: 18, fontWeight: "bold" },
-  reportButton: { color: "#FF6B6B", fontSize: 14, fontWeight: "600" },
->>>>>>> db1e4852413b40f32f067c8fd1996394beaba3bc
   completedBanner: {
     flexDirection: "row",
     backgroundColor: "#E8F5E9",
@@ -506,7 +496,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 10,
   },
-<<<<<<< HEAD
   myMessage: {
     alignSelf: "flex-end",
     backgroundColor: "#4A90E2",
@@ -544,16 +533,6 @@ const styles = StyleSheet.create({
   theirTimestamp: {
     color: "#999",
   },
-=======
-  myMessage: { alignSelf: "flex-end", backgroundColor: "#4A90E2" },
-  theirMessage: { alignSelf: "flex-start", backgroundColor: "white" },
-  messageText: { fontSize: 15, lineHeight: 20 },
-  myMessageText: { color: "white" },
-  theirMessageText: { color: "#333" },
-  timestamp: { fontSize: 11, marginTop: 4 },
-  myTimestamp: { color: "rgba(255,255,255,0.7)", textAlign: "right" },
-  theirTimestamp: { color: "#999" },
->>>>>>> db1e4852413b40f32f067c8fd1996394beaba3bc
   inputContainer: {
     flexDirection: "row",
     padding: 10,
@@ -599,7 +578,6 @@ const styles = StyleSheet.create({
     borderTopColor: "#e0e0e0",
     alignItems: "center",
   },
-<<<<<<< HEAD
   readOnlyText: {
     fontSize: 13,
     color: "#666",
@@ -708,7 +686,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-=======
-  readOnlyText: { fontSize: 13, color: "#666", fontStyle: "italic" },
->>>>>>> db1e4852413b40f32f067c8fd1996394beaba3bc
 });
