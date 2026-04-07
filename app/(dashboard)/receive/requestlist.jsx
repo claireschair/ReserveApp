@@ -454,9 +454,52 @@ const RequestList = () => {
   if (loading) {
     return (
       <ThemedView style={styles.container}>
-        <Spacer height={70} />
-        <ThemedText>Loading matches...</ThemedText>
-      </ThemedView>
+      <Spacer height={100} />
+
+      {/* Header */}
+      <View style={styles.headerCard}>
+        <ThemedText style={styles.heading}>Request Matches</ThemedText>
+        <Spacer height={2} />
+        <ThemedText style={styles.subtitle}>
+          See donors who match your requests!
+        </ThemedText>
+      </View>
+
+      {/* Fake search + filter bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.loadingSearchBar} />
+        <View style={styles.loadingFilterButton} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={styles.loadingCard}>
+            {/* Header */}
+            <View style={styles.loadingLineShort} />
+
+            <Spacer height={10} />
+
+            {/* Items list */}
+            <View style={styles.loadingLine} />
+            <View style={styles.loadingLine} />
+            <View style={styles.loadingLineShort} />
+
+            <Spacer height={12} />
+
+            {/* Match card inside */}
+            <View style={styles.loadingInnerCard}>
+              <View style={styles.loadingLineShort} />
+              <View style={styles.loadingLine} />
+              <View style={styles.loadingLineShort} />
+
+              <Spacer height={10} />
+
+              <View style={styles.loadingButton} />
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </ThemedView>
     );
   }
 
@@ -1064,4 +1107,49 @@ const styles = StyleSheet.create({
   itemSpecItemName: { fontSize: 13, color: "#333", fontWeight: "500" },
   itemSpecQty: { fontSize: 13, color: "#888", fontWeight: "400" },
   itemSpecDetail: { fontSize: 13, color: "#4A90E2", fontStyle: "italic", fontWeight: "400" },
+  loadingCard: {
+  backgroundColor: "#FFFFFF",
+  padding: 18,
+  borderRadius: 18,
+  marginBottom: 20,
+  opacity: 0.6,
+},
+
+loadingInnerCard: {
+  backgroundColor: "#f4f7fb",
+  padding: 12,
+  borderRadius: 12,
+  marginTop: 8,
+},
+loadingLine: {
+  width: "90%",
+  height: 12,
+  backgroundColor: "#e6edf7",
+  borderRadius: 6,
+  marginTop: 6,
+},
+loadingLineShort: {
+  width: "60%",
+  height: 12,
+  backgroundColor: "#e6edf7",
+  borderRadius: 6,
+},
+loadingButton: {
+  width: "100%",
+  height: 40,
+  backgroundColor: "#dbe6f5",
+  borderRadius: 12,
+},
+loadingSearchBar: {
+  flex: 1,
+  height: 40,
+  backgroundColor: "#e6edf7",
+  borderRadius: 25,
+},
+loadingFilterButton: {
+  width: 80,
+  height: 40,
+  backgroundColor: "#dbe6f5",
+  borderRadius: 20,
+},
 });

@@ -7,6 +7,7 @@ import Spacer from "../../components/Spacer";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import ThemedLogo from "../../components/ThemedLogo";
+import { Linking, TouchableOpacity } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -128,6 +129,74 @@ const Home = () => {
               <View style={styles.speechTailBorder} />
               <View style={styles.speechTail} />
             </View>
+          </View>
+
+
+          <Spacer height={10} />
+
+          <View style={styles.globalStatsCard}>
+            <ThemedText style={styles.subheading}>
+              Global Education 🌍
+            </ThemedText>
+
+            <Spacer height={5} />
+
+            <View style={styles.globalStatItem}>
+              <ThemedText style={styles.globalIcon}>📚</ThemedText>
+              <View style={styles.globalTextWrap}>
+                <ThemedText style={styles.globalStatTitle}>
+                  244 Million Children
+                </ThemedText>
+                <ThemedText style={styles.globalStatDesc}>
+                  Around the world are out of school, limiting future opportunities and economic mobility.
+                </ThemedText>
+              </View>
+            </View>
+          
+            <View style={styles.globalStatItem}>
+              <ThemedText style={styles.globalIcon}>✏️</ThemedText>
+              <View style={styles.globalTextWrap}>
+                <ThemedText style={styles.globalStatTitle}>
+                  Learning Poverty
+                </ThemedText>
+                <ThemedText style={styles.globalStatDesc}>
+                  7 out of 10 children in low-income countries cannot read a simple story by age 10.
+                </ThemedText>
+              </View>
+            </View>
+          
+            <View style={styles.globalStatItem}>
+              <ThemedText style={styles.globalIcon}>🏫</ThemedText>
+              <View style={styles.globalTextWrap}>
+                <ThemedText style={styles.globalStatTitle}>
+                  Classroom Gaps
+                </ThemedText>
+                <ThemedText style={styles.globalStatDesc}>
+                  Many schools lack basic materials like books, desks, and writing tools needed for daily learning.
+                </ThemedText>
+              </View>
+            </View>
+          
+            <View style={styles.globalStatItem}>
+              <ThemedText style={styles.globalIcon}>👩‍🏫</ThemedText>
+              <View style={styles.globalTextWrap}>
+                <ThemedText style={styles.globalStatTitle}>
+                  Teacher Shortage
+                </ThemedText>
+                <ThemedText style={styles.globalStatDesc}>
+                  The world needs nearly 69 million more teachers to achieve universal education by 2030.
+                </ThemedText>
+              </View>
+            </View>
+            <Spacer height={5} />
+            <TouchableOpacity
+              style={styles.learnMoreButton}
+              onPress={() => Linking.openURL('https://ourworldindata.org/global-education')}
+            >
+              <ThemedText style={styles.learnMoreText}>
+                Learn More →
+              </ThemedText>
+            </TouchableOpacity>
           </View>
 
 
@@ -469,5 +538,66 @@ mascotText: {
   fontSize: 13,
   lineHeight: 18,
   color: '#333',
+},
+globalStatsCard: {
+  width: '90%',
+  alignSelf: 'center',
+  backgroundColor: '#ffffff',
+  borderRadius: 28,
+  paddingVertical: 20,
+  paddingHorizontal: 18,
+  marginTop: 30,
+
+  shadowColor: '#000',
+  shadowOpacity: 0.06,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 6,
+},
+globalStatItem: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  marginTop: 18,
+},
+globalIcon: {
+  fontSize: 22,
+  marginRight: 12,
+  marginLeft: 8,
+  marginTop: 2,
+},
+globalTextWrap: {
+  flex: 1,
+},
+globalStatTitle: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#4f81ba',
+},
+globalStatDesc: {
+  fontSize: 13,
+  color: '#333',
+  marginTop: 3,
+  lineHeight: 18,
+},
+learnMoreButton: {
+  marginTop: 10,
+  alignSelf: 'center',
+  backgroundColor: '#598dc4',
+  paddingVertical: 10,
+  paddingHorizontal: 22,
+  borderRadius: 18,
+  marginBottom: 10,
+
+  shadowColor: '#000',
+  shadowOpacity: 0.12,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 4,
+},
+
+learnMoreText: {
+  color: '#ffffff',
+  fontSize: 14,
+  fontWeight: '600',
 },
 });

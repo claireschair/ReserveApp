@@ -412,9 +412,47 @@ const DonationList = () => {
   if (loading) {
     return (
       <ThemedView style={styles.container}>
-        <Spacer height={70} />
-        <ThemedText>Loading donations...</ThemedText>
-      </ThemedView>
+      <Spacer height={100} />
+
+      <View style={styles.headerCard}>
+        <ThemedText title style={styles.heading}>
+          My Donations
+        </ThemedText>
+        <ThemedText style={styles.subtitle}>
+          View your past and current donations!
+        </ThemedText>
+      </View>
+      <Spacer height={30} />
+      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={styles.loadingCard}>
+            <View style={styles.loadingLineWide} />
+            
+            <Spacer height={8} />
+
+            <View style={styles.loadingLine} />
+            <View style={styles.loadingLineShort} />
+
+            <Spacer height={10} />
+
+            <View style={styles.loadingLineTiny} />
+            <Spacer height={15} />
+            <View style={styles.loadingInnerCard}>
+              <View style={styles.loadingLine} />
+              <View style={styles.loadingLineShort} />
+
+              <Spacer height={10} />
+
+              <View style={styles.loadingButtonRow}>
+                <View style={styles.loadingButtonSmall} />
+                <View style={styles.loadingButtonSmall} />
+              </View>
+            </View>
+
+          </View>
+        ))}
+      </ScrollView>
+    </ThemedView>
     );
   }
 
@@ -990,4 +1028,52 @@ const styles = StyleSheet.create({
   pageButtonActive: { backgroundColor: "#4A90E2", borderColor: "#4A90E2" },
   pageButtonText: { fontSize: 14, fontWeight: "600", color: "#666" },
   pageButtonTextActive: { color: "white" },
+  loadingCard: {
+  backgroundColor: "#FFFFFF",
+  padding: 18,
+  borderRadius: 18,
+  marginBottom: 18,
+  opacity: 0.6,
+},
+loadingInnerCard: {
+  backgroundColor: "#f4f7fb",
+  padding: 14,
+  borderRadius: 14,
+},
+loadingLineWide: {
+  width: "70%",
+  height: 14,
+  backgroundColor: "#dbe6f5",
+  borderRadius: 6,
+},
+loadingLine: {
+  width: "90%",
+  height: 12,
+  backgroundColor: "#e6edf7",
+  borderRadius: 6,
+},
+loadingLineShort: {
+  width: "60%",
+  height: 12,
+  backgroundColor: "#e6edf7",
+  borderRadius: 6,
+  marginTop: 6,
+},
+loadingLineTiny: {
+  width: "40%",
+  height: 10,
+  backgroundColor: "#e6edf7",
+  borderRadius: 6,
+},
+loadingButtonRow: {
+  flexDirection: "row",
+  gap: 10,
+  marginTop: 10,
+},
+loadingButtonSmall: {
+  flex: 1,
+  height: 36,
+  backgroundColor: "#dbe6f5",
+  borderRadius: 10,
+},
 });

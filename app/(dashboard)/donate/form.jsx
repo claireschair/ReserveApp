@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
   error: { color: "red", fontSize: 14, marginBottom: 10, marginTop: 5 },
   input: {
     width: "90%",
-    backgroundColor: "#e9f0f9",
+    backgroundColor: "#f8f8f8",
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderRadius: 20,

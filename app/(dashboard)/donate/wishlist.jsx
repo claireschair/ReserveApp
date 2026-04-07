@@ -117,10 +117,36 @@ const Wishlist = () => {
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <Spacer height={70} />
-        <ThemedText>Loading wishlists...</ThemedText>
-      </ThemedView>
+      <ThemedView style={styles.pageContainer}>
+      <Spacer height={100} />
+      <View style={styles.headerCard}>
+        <ThemedText style={styles.heading}>Teachers' Wishlists</ThemedText>
+        <Spacer height={2} />
+        <ThemedText style={styles.subtitle}>
+          Support classrooms by donating needed supplies
+        </ThemedText>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={styles.loadingCard}>
+            <View style={styles.loadingHeaderRow}>
+              <View style={styles.loadingCircle} />
+              <View style={styles.loadingTextBlock} />
+            </View>
+
+            <Spacer height={12} />
+
+            <View style={styles.loadingLine} />
+            <View style={styles.loadingLineShort} />
+
+            <Spacer height={15} />
+
+            <View style={styles.loadingButton} />
+          </View>
+        ))}
+      </ScrollView>
+    </ThemedView>
     );
   }
 
@@ -560,4 +586,47 @@ const styles = StyleSheet.create({
     backgroundColor: "#4F7BFF",
     borderColor: "#4F7BFF",
   },
+  loadingCard: {
+  backgroundColor: "#FFFFFF",
+  padding: 22,
+  borderRadius: 20,
+  marginBottom: 18,
+  opacity: 0.6, 
+},
+loadingHeaderRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 10,
+},
+loadingCircle: {
+  width: 38,
+  height: 38,
+  borderRadius: 19,
+  backgroundColor: "#dbe6f5",
+},
+loadingTextBlock: {
+  width: "50%",
+  height: 14,
+  backgroundColor: "#dbe6f5",
+  borderRadius: 6,
+},
+loadingLine: {
+  width: "90%",
+  height: 12,
+  backgroundColor: "#e6edf7",
+  borderRadius: 6,
+},
+loadingLineShort: {
+  width: "60%",
+  height: 12,
+  backgroundColor: "#e6edf7",
+  borderRadius: 6,
+  marginTop: 6,
+},
+loadingButton: {
+  width: "100%",
+  height: 40,
+  backgroundColor: "#dbe6f5",
+  borderRadius: 12,
+},
 });
