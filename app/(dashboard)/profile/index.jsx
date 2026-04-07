@@ -3,6 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { Modal, TextInput } from 'react-native';
 import React, { useEffect, useState } from 'react';
+import { db } from '../../../lib/firebase';
+import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { 
   updateNotificationPreference, 
   getNotificationPreference 
@@ -29,7 +31,7 @@ const Profile = () => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-
+  const [stats, setStats] = useState({ donations: 0, received: 0 });
 
   useEffect(() => {
     loadNotificationPreference();
@@ -103,6 +105,41 @@ const Profile = () => {
       setDeleteLoading(false);
     }
   };
+  const loadUserStats = async () => {
+    if (!user?.uid) return;
+    
+    try {
+      const q = query(
+        collection(db, 'requests'),
+        where('userId', '==', user.uid),
+        where('status', '==', 'completed')
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      let donationCount = 0;
+      let receivedCount = 0;
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const total = (data.quantities || []).reduce((sum, qty) => sum + qty, 0);
+        
+        if (data.type === 'donate') {
+          donationCount += total;
+        } else if (data.type === 'receive') {
+          receivedCount += total;
+        }
+      });
+      
+      setStats({ donations: donationCount, received: receivedCount });
+    } catch (err) {
+      console.error('Error loading stats:', err);
+    }
+  };
+  useEffect(() => {
+    loadNotificationPreference();
+    loadUserStats();
+  }, [user?.uid]);
 
   if (!authChecked) {
     return (
@@ -186,7 +223,7 @@ const Profile = () => {
           <View style={styles.impactCard}>
             <Ionicons name="school-outline" size={28} color="#4A90E2" />
             <ThemedText style={styles.impactNumber}>
-              {/*PLEASE HELP FAYE*/} 
+              {stats.donations} 
               {user?.stats?.donations || 0}
             </ThemedText>
             <ThemedText style={styles.impactLabel}>
@@ -197,7 +234,7 @@ const Profile = () => {
           <View style={styles.impactCard}>
             <Ionicons name="heart-outline" size={28} color="#4A90E2" />
             <ThemedText style={styles.impactNumber}>
-              {/*PLEASE HELP FAYE*/} 
+              {stats.received} 
               {user?.stats?.points || 0}
             </ThemedText>
             <ThemedText style={styles.impactLabel}>
