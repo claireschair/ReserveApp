@@ -399,6 +399,7 @@ export function MatchProvider({ children }) {
         completedAt: Timestamp.now(),
         completionType,
         completedBy: userId,
+        exchangedQuantities,
         "match.chatId": chatId,
       });
 
@@ -407,6 +408,7 @@ export function MatchProvider({ children }) {
         completedAt: Timestamp.now(),
         completionType,
         completedBy: userId,
+        exchangedQuantities,
         "match.chatId": chatId,
       });
 
@@ -1035,7 +1037,14 @@ export function MatchProvider({ children }) {
       completedDonations.forEach((donation) => {
         if (donation.items && donation.quantities) {
           donation.items.forEach((item, index) => {
-            totalItemsDistributed += donation.quantities[index] || 1;
+            const key = item.toLowerCase().trim();
+            if (donation.exchangedQuantities && key in donation.exchangedQuantities) {
+              totalItemsDistributed += donation.exchangedQuantities[key] || 0;
+            } else if (donation.completionType === "nocoordination") {
+              // Nothing was exchanged
+            } else {
+              totalItemsDistributed += donation.quantities[index] || 1;
+            }
           });
         }
       });

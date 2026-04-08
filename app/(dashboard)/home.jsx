@@ -20,7 +20,6 @@ const Home = () => {
   useEffect(() => {
     loadStats();
 
-    // Set up real-time listener for completed donations
     const completedQuery = query(
       collection(db, "requests"),
       where("status", "==", "completed"),
@@ -30,7 +29,6 @@ const Home = () => {
     const unsubscribe = onSnapshot(
       completedQuery,
       (snapshot) => {
-        // Recalculate stats when completed donations change
         loadStats();
       },
       (error) => {
