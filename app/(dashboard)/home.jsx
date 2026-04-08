@@ -8,6 +8,7 @@ import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import ThemedLogo from "../../components/ThemedLogo";
 import { Linking, TouchableOpacity } from 'react-native';
+import Entypo from '@expo/vector-icons/Entypo';
 
 const { width, height } = Dimensions.get('window');
 
@@ -136,7 +137,7 @@ const Home = () => {
 
           <View style={styles.globalStatsCard}>
             <ThemedText style={styles.subheading}>
-              Global Education 🌍
+              Global Education
             </ThemedText>
 
             <Spacer height={5} />
