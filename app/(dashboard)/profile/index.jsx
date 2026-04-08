@@ -37,6 +37,9 @@ const Profile = () => {
     loadNotificationPreference();
   }, [user?.uid]);
 
+  // Real-time listener for impact stats.
+  // Subscribes to all completed requests for this user and sums quantities.
+  // Cleans up the listener when the component unmounts or user changes.
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -54,12 +57,19 @@ const Profile = () => {
 
         snapshot.forEach((doc) => {
           const data = doc.data();
-          const total = (data.quantities || []).reduce((sum, qty) => sum + (qty || 0), 0);
 
-          if (data.type === 'donate') {
-            donationCount += total;
-          } else if (data.type === 'receive') {
-            receivedCount += total;
+          if (data.completionType === "nocoordination") {
+            return;
+          }
+
+          if (data.exchangedQuantities && Object.keys(data.exchangedQuantities).length > 0) {
+            const total = Object.values(data.exchangedQuantities).reduce((sum, qty) => sum + (qty || 0), 0);
+            if (data.type === 'donate') donationCount += total;
+            else if (data.type === 'receive') receivedCount += total;
+          } else {
+            const total = (data.quantities || []).reduce((sum, qty) => sum + (qty || 0), 0);
+            if (data.type === 'donate') donationCount += total;
+            else if (data.type === 'receive') receivedCount += total;
           }
         });
 
