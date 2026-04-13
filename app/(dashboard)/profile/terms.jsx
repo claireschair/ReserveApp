@@ -12,23 +12,96 @@ const htmlContent = `
 <title>Terms and Conditions</title>
 <style>
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #444;
-    line-height: 1.6;
-    padding: 20px;
-  }
-  h1 { font-size: 24px; margin-bottom: 16px; }
-  h2 { font-size: 18px; margin-top: 28px; }
-  h3 { font-size: 16px; margin-top: 24px; }
-  p { margin-bottom: 16px; }
-  ol.index { padding-left: 20px; }
-  a { color: #007AFF; text-decoration: none; }
-  .madewith img { margin-top: 20px; }
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
+  background-color: #F8F9FB;
+  padding: 12px;
+  margin-top: 78px;
+}
+
+.container {
+  background: white;
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: 0px 6px 20px rgba(0,0,0,0.06);
+}
+
+h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  color: #888;
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+
+h2 {
+  font-size: 18px;
+  margin-top: 26px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #EEF2FF;
+  border-radius: 12px;
+}
+
+h3 {
+  font-size: 17px;
+  margin-top: 16px;
+  font-weight: 600;
+}
+
+p, li {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.7;
+}
+
+ul, ol {
+  padding-left: 20px;
+}
+.index ol {
+  padding-left: 45px;  
+}
+
+.index h3{
+  margin-left: 15px;
+}
+
+a {
+  color: "#4A90E2"; 
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.index {
+  background: #F1F5FF;
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.index a {
+  display: inline-block;
+  padding: 4px 0;
+}
+
+
+.highlight {
+  background: #EEF2FF;
+  padding: 12px;
+  border-radius: 12px;
+  margin: 12px 0;
+}
 </style>
 </head>
 <body>
 
-<h1>Terms and conditions</h1>
+<body>
+  <div class="container">
+    <h1>Terms & Conditions</h1>
+    <div class="subtitle">Last updated February 28, 2026</div>
 <p>These terms and conditions (“Agreement”) set forth the general terms and conditions of your use of the “Reserve” mobile application (“Mobile Application” or “Service”) and any of its related products and services (collectively, “Services”). This Agreement is legally binding between you (“User”, “you” or “your”) and this Mobile Application developer (“Operator”, “we”, “us” or “our”). If you are entering into this Agreement on behalf of a business or other legal entity, you represent that you have the authority to bind such entity to this Agreement, in which case the terms “User”, “you” or “your” shall refer to such entity. If you do not have such authority, or if you do not agree with the terms of this Agreement, you must not accept this Agreement and may not access and use the Mobile Application and Services. By accessing and using the Mobile Application and Services, you acknowledge that you have read, understood, and agree to be bound by the terms of this Agreement. You acknowledge that this Agreement is a contract between you and the Operator, even though it is electronic and is not physically signed by you, and it governs your use of the Mobile Application and Services.</p>
 
 <div class="index">
@@ -77,10 +150,10 @@ const htmlContent = `
 
 <h2 id="contacting-us">Contacting us</h2>
 <p>If you have any questions, concerns, or complaints regarding this Agreement, we encourage you to contact us using the details below:</p>
-<p><a href="&#109;&#097;&#105;&#108;&#116;&#111;&#058;&#99;l&#97;&#105;&#114;&#101;&#46;&#119;&#101;ng.20&#48;9&#64;gmai&#108;&#46;c&#111;&#109;">&#99;&#108;ai&#114;e.&#119;&#101;n&#103;&#46;200&#57;&#64;gma&#105;l.&#99;&#111;&#109;</a></p>
+<p><a href="mailto:reservesupplyapp@gmail.com">reservesupplyapp@gmail.com</a></p>
 
 
-<p><strong>Last updated February 28, 2026</strong></p>
+<p></p>
 
 </body>
 </html>

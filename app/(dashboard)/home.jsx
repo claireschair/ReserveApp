@@ -9,6 +9,10 @@ import ThemedView from "../../components/ThemedView";
 import ThemedLogo from "../../components/ThemedLogo";
 import { Linking, TouchableOpacity } from 'react-native';
 import Entypo from '@expo/vector-icons/Entypo';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 
 const { width, height } = Dimensions.get('window');
 
@@ -135,13 +139,13 @@ const Home = () => {
 
           <View style={styles.globalStatsCard}>
             <ThemedText style={styles.subheading}>
-              Global Education
+              Global Education <Entypo name="globe" size={20} color="#4A90E2" />
             </ThemedText>
 
             <Spacer height={5} />
 
             <View style={styles.globalStatItem}>
-              <ThemedText style={styles.globalIcon}>📚</ThemedText>
+              <ThemedText style={styles.globalIcon}><MaterialCommunityIcons name="bookshelf" size={24} color="#4A90E2" /></ThemedText>
               <View style={styles.globalTextWrap}>
                 <ThemedText style={styles.globalStatTitle}>
                   244 Million Children
@@ -153,7 +157,7 @@ const Home = () => {
             </View>
           
             <View style={styles.globalStatItem}>
-              <ThemedText style={styles.globalIcon}>✏️</ThemedText>
+              <ThemedText style={styles.globalIcon}><FontAwesome name="pencil" size={24} color="#4A90E2" /></ThemedText>
               <View style={styles.globalTextWrap}>
                 <ThemedText style={styles.globalStatTitle}>
                   Learning Poverty
@@ -165,7 +169,7 @@ const Home = () => {
             </View>
           
             <View style={styles.globalStatItem}>
-              <ThemedText style={styles.globalIcon}>🏫</ThemedText>
+              <ThemedText style={styles.globalIcon}><FontAwesome6 name="school" size={17} color="#4A90E2"/></ThemedText>
               <View style={styles.globalTextWrap}>
                 <ThemedText style={styles.globalStatTitle}>
                   Classroom Gaps
@@ -177,7 +181,7 @@ const Home = () => {
             </View>
           
             <View style={styles.globalStatItem}>
-              <ThemedText style={styles.globalIcon}>👩‍🏫</ThemedText>
+              <ThemedText style={styles.globalIcon}><FontAwesome5 name="chalkboard-teacher" size={17} color="#4A90E2" /></ThemedText>
               <View style={styles.globalTextWrap}>
                 <ThemedText style={styles.globalStatTitle}>
                   Teacher Shortage
