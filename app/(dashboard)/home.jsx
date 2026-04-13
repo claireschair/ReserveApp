@@ -126,15 +126,10 @@ const Home = () => {
           <Spacer height={10} />
 
           <View style={styles.globalStatsCard}>
-<<<<<<< HEAD
             <ThemedText style={styles.subheading}>
               Global Education <Entypo name="globe" size={20} color="#4A90E2" />
             </ThemedText>
 
-=======
-            <ThemedText style={styles.subheading}>Global Education 🌍</ThemedText>
->>>>>>> 41e5f42af52daddfed25ee7abb574be37806f6e9
-            <Spacer height={5} />
 
             <View style={styles.globalStatItem}>
               <ThemedText style={styles.globalIcon}><MaterialCommunityIcons name="bookshelf" size={24} color="#4A90E2" /></ThemedText>
