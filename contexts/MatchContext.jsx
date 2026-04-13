@@ -1035,16 +1035,20 @@ export function MatchProvider({ children }) {
 
       let totalItemsDistributed = 0;
       completedDonations.forEach((donation) => {
-        if (donation.items && donation.quantities) {
-          donation.items.forEach((item, index) => {
-            const key = item.toLowerCase().trim();
-            if (donation.exchangedQuantities && key in donation.exchangedQuantities) {
-              totalItemsDistributed += donation.exchangedQuantities[key] || 0;
-            } else if (donation.completionType === "nocoordination") {
-              // Nothing was exchanged
-            } else {
-              totalItemsDistributed += donation.quantities[index] || 1;
-            }
+        if (!donation.items || !donation.quantities) return;
+        if (donation.completionType === "nocoordination") return;
+
+        if (donation.exchangedQuantities && Object.keys(donation.exchangedQuantities).length > 0) {
+          // exchangedQuantities is present — only count items that are in it.
+          // Items absent from the map were not exchanged (they were resubmitted).
+          Object.values(donation.exchangedQuantities).forEach((qty) => {
+            totalItemsDistributed += qty || 0;
+          });
+        } else {
+          // Legacy completed doc written before exchangedQuantities existed —
+          // fall back to original quantities as a best-effort estimate.
+          donation.quantities.forEach((qty) => {
+            totalItemsDistributed += qty || 1;
           });
         }
       });
