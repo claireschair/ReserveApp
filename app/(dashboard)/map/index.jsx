@@ -22,7 +22,6 @@ const Map = () => {
         const data = await getDonationCenters();
         console.log("RAW donation centers:", data);
         
-        // Filter to only show active donation drives
         const now = new Date();
         const activeCenters = data.filter(center => {
           if (!center.startDate || !center.endDate) return true;

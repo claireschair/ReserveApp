@@ -204,7 +204,6 @@ const DonationForm = () => {
 
             <Spacer height={20} />
 
-            {/* ── Supply grid ── */}
             <ThemedText>Select Supplies to Donate:</ThemedText>
             <Spacer height={10} />
             <View style={styles.supplyContainer}>
@@ -256,7 +255,6 @@ const DonationForm = () => {
 
             <Spacer height={15} />
 
-            {/* ── Add other items ── */}
             <ThemedText>Add Other Items (Optional):</ThemedText>
             <Spacer height={10} />
             <View style={styles.otherInputWrapper}>
@@ -286,7 +284,6 @@ const DonationForm = () => {
               </TouchableOpacity>
             )}
 
-            {/* ── Selected items summary with qty + specs ── */}
             {allSelectedItems.length > 0 && (
               <>
                 <Spacer height={20} />
@@ -297,7 +294,6 @@ const DonationForm = () => {
                     const isOther = otherItems.includes(item);
                     return (
                       <View key={item} style={styles.selectedItemRow}>
-                        {/* Item name + remove button */}
                         <View style={styles.selectedItemLeft}>
                           <TouchableOpacity
                             style={styles.removeChipButton}
@@ -323,7 +319,6 @@ const DonationForm = () => {
                           </View>
                         </View>
 
-                        {/* Qty input */}
                         <View style={styles.selectedItemQty}>
                           <ThemedText style={styles.qtyLabel}>Qty</ThemedText>
                           <TextInput
@@ -339,7 +334,6 @@ const DonationForm = () => {
                           />
                         </View>
 
-                        {/* Specs input */}
                         <TextInput
                           style={styles.specInput}
                           value={itemSpecs[item] || ""}
@@ -358,7 +352,6 @@ const DonationForm = () => {
 
             <Spacer height={20} />
 
-            {/* ── Matching method ── */}
             <ThemedText>Choose Matching Method:</ThemedText>
             <Spacer height={10} />
             <View style={styles.radioContainer}>
@@ -437,8 +430,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#bcd7f5ff" },
   scrollContent: { padding: 20, alignItems: "center" },
   heading: { fontWeight: "bold", fontSize: 28, color: "#1F2A37", textAlign: "center" },
-
-  // Supply grid
   supplyContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -462,8 +453,6 @@ const styles = StyleSheet.create({
   itemSelected: { backgroundColor: "#4A90E2", borderColor: "#4A90E2", shadowOpacity: 0.2 },
   itemText: { textAlign: "center", color: "#333", fontWeight: "500" },
   itemTextSelected: { textAlign: "center", color: "#fff", fontWeight: "bold" },
-
-  // Other item input
   otherInputWrapper: {
     flexDirection: "row",
     width: "90%",
@@ -491,7 +480,6 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: "#fff", fontWeight: "600" },
 
-  // Selected items summary section
   selectedItemsContainer: {
     width: "90%",
     backgroundColor: "#fff",
@@ -572,7 +560,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 
-  // Location / method
   radioContainer: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -34,7 +34,7 @@ const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
   }, []);
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Radius of Earth in kilometers
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
@@ -42,7 +42,7 @@ const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in kilometers
+    return R * c;
   };
 
   const performSearch = async (text) => {
@@ -57,7 +57,6 @@ const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
     try {
       let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&addressdetails=1&limit=10`;
 
-      // Add location bias if available
       if (userLocation) {
         url += `&lat=${userLocation.latitude}&lon=${userLocation.longitude}&bounded=1&viewbox=${userLocation.longitude - 0.1},${userLocation.latitude + 0.1},${userLocation.longitude + 0.1},${userLocation.latitude - 0.1}`;
       }
@@ -81,7 +80,6 @@ const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
 
       const data = await res.json();
       
-      // Sort results by distance from user if location is available
       if (userLocation && data.length > 0) {
         data.sort((a, b) => {
           const distA = getDistance(
@@ -100,7 +98,6 @@ const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
         });
       }
 
-      // Limit to top 5 after sorting
       setResults(data.slice(0, 5) || []);
       setIsSearching(false);
     } catch (err) {
@@ -112,18 +109,15 @@ const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
   const searchPlaces = (text) => {
     setQuery(text);
 
-    // Clear existing timer
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
 
-    // Set new timer - wait 800ms after user stops typing
     debounceTimer.current = setTimeout(() => {
       performSearch(text);
     }, 800);
   };
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (debounceTimer.current) {
@@ -132,12 +126,10 @@ const PlaceSearchInput = ({ onSelect, onFocus, onBlur }) => {
     };
   }, []);
 
-  // Helper function to get a clean display name
   const getDisplayName = (item) => {
     return item.display_name || item.name || "Unnamed location";
   };
 
-  // Helper function to get a short name for selection
   const getShortName = (item) => {
     if (item.name) return item.name;
     if (item.address?.amenity) return item.address.amenity;

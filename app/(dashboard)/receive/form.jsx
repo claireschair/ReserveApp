@@ -204,7 +204,6 @@ const ReceiveForm = () => {
 
             <Spacer height={20} />
 
-            {/* ── Supply grid ── */}
             <ThemedText>Select Supplies Needed:</ThemedText>
             <Spacer height={10} />
             <View style={styles.supplyContainer}>
@@ -256,7 +255,6 @@ const ReceiveForm = () => {
 
             <Spacer height={15} />
 
-            {/* ── Add other items ── */}
             <ThemedText>Add Other Items (Optional):</ThemedText>
             <Spacer height={10} />
             <View style={styles.otherInputWrapper}>
@@ -286,7 +284,6 @@ const ReceiveForm = () => {
               </TouchableOpacity>
             )}
 
-            {/* ── Selected items summary with qty + specs ── */}
             {allSelectedItems.length > 0 && (
               <>
                 <Spacer height={20} />
@@ -297,7 +294,7 @@ const ReceiveForm = () => {
                     const isOther = otherItems.includes(item);
                     return (
                       <View key={item} style={styles.selectedItemRow}>
-                        {/* Item name + remove button */}
+
                         <View style={styles.selectedItemLeft}>
                           <TouchableOpacity
                             style={styles.removeChipButton}
@@ -323,7 +320,6 @@ const ReceiveForm = () => {
                           </View>
                         </View>
 
-                        {/* Qty input */}
                         <View style={styles.selectedItemQty}>
                           <ThemedText style={styles.qtyLabel}>Qty</ThemedText>
                           <TextInput
@@ -339,7 +335,6 @@ const ReceiveForm = () => {
                           />
                         </View>
 
-                        {/* Specs input */}
                         <TextInput
                           style={styles.specInput}
                           value={itemSpecs[item] || ""}
@@ -358,7 +353,6 @@ const ReceiveForm = () => {
 
             <Spacer height={20} />
 
-            {/* ── Matching method ── */}
             <ThemedText>Choose Matching Method:</ThemedText>
             <Spacer height={10} />
             <View style={styles.radioContainer}>

@@ -16,7 +16,7 @@ const Login = () => {
   const [error, setError] = useState()
   const [showForgot, setShowForgot] = useState(false)
   const [resetEmail, setResetEmail] = useState("")
-  const [resetStatus, setResetStatus] = useState(null) // 'sent' | 'error' | null
+  const [resetStatus, setResetStatus] = useState(null) 
   const [resetLoading, setResetLoading] = useState(false)
   const { login, resetPassword } = useUser()
   const router = useRouter()
@@ -85,12 +85,11 @@ const Login = () => {
             <Text style={{ color: '#f2f2f2' }}>Login</Text>
           </ThemedButton>
 
-          {/* Forgot password toggle */}
           <Text
             style={styles.forgotLink}
             onPress={() => {
               setShowForgot(!showForgot)
-              setResetEmail(email) // pre-fill with whatever they typed
+              setResetEmail(email)
               setResetStatus(null)
             }}
           >
