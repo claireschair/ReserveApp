@@ -88,7 +88,6 @@ const SelectDonationLocation = () => {
       setEndDate(new Date());
       alert("Donation center added!");
       
-      // Redirect to map page
       router.push("/(dashboard)/map");
     } catch (err) {
       setError(err.message || "Something went wrong.");
@@ -200,7 +199,6 @@ const SelectDonationLocation = () => {
           <ThemedText style={styles.locationText}>📍 {placeName}</ThemedText>
         )}
 
-        {/* Date Pickers */}
         <View style={styles.dateContainer}>
           <View style={styles.dateSection}>
             <ThemedText style={styles.label}>Start Date:</ThemedText>
@@ -229,7 +227,6 @@ const SelectDonationLocation = () => {
           </View>
         </View>
 
-        {/* iOS Modal Date Pickers */}
         {Platform.OS === 'ios' && showStartPicker && (
           <Modal
             transparent={true}
@@ -284,7 +281,6 @@ const SelectDonationLocation = () => {
           </Modal>
         )}
 
-        {/* Android Date Pickers */}
         {Platform.OS === 'android' && showStartPicker && (
           <DateTimePicker
             value={startDate}

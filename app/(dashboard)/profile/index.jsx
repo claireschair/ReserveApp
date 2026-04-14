@@ -37,9 +37,7 @@ const Profile = () => {
     loadNotificationPreference();
   }, [user?.uid]);
 
-  // Real-time listener for impact stats.
-  // Subscribes to all completed requests for this user and sums quantities.
-  // Cleans up the listener when the component unmounts or user changes.
+
   useEffect(() => {
     if (!user?.uid) return;
 

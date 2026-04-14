@@ -166,7 +166,6 @@ const Register = () => {
 
             <Spacer height={10} />
 
-            {/* NAME */}
             <ThemedTextInput
               style={styles.input}
               placeholder="Name"
@@ -174,7 +173,6 @@ const Register = () => {
               onChangeText={setName}
             />
 
-            {/* ROLE DROPDOWN */}
             <View style={[styles.dropdownContainer, { zIndex: 2000 }]}>
               <TouchableOpacity
                 style={styles.dropdownButton}
@@ -203,10 +201,8 @@ const Register = () => {
               )}
             </View>
 
-            {/* SCHOOL SEARCH */}
             <View style={[styles.dropdownContainer, { zIndex: 1000 }]}>
               {isCustomSchool ? (
-                // Custom school input
                 <View>
                   <ThemedTextInput
                     style={[
@@ -224,7 +220,6 @@ const Register = () => {
                   </TouchableOpacity>
                 </View>
               ) : (
-                // School search input + results
                 <>
                   <ThemedTextInput
                     style={[
@@ -258,7 +253,6 @@ const Register = () => {
                         </TouchableOpacity>
                       ))}
 
-                      {/* Other option at bottom of results */}
                       <TouchableOpacity
                         style={[styles.dropdownItem, styles.otherDropdownItem]}
                         onPress={handleSelectOther}
@@ -270,7 +264,6 @@ const Register = () => {
                     </View>
                   )}
 
-                  {/* Other link shown below input when search yields no results */}
                   {showOtherLink && (
                     <TouchableOpacity onPress={handleSelectOther} style={styles.otherLink}>
                       <ThemedText style={styles.otherLinkText}>
@@ -282,7 +275,6 @@ const Register = () => {
               )}
             </View>
 
-            {/* EMAIL */}
             <ThemedTextInput
               style={styles.input}
               placeholder="Email"
@@ -291,7 +283,6 @@ const Register = () => {
               keyboardType="email-address"
             />
 
-            {/* PASSWORD */}
             <ThemedTextInput
               style={styles.input}
               placeholder="Password"
@@ -300,7 +291,6 @@ const Register = () => {
               secureTextEntry
             />
 
-            {/* AGE CHECKBOX */}
             <TouchableOpacity
               style={styles.checkboxRow}
               onPress={() => setIsAdult(!isAdult)}

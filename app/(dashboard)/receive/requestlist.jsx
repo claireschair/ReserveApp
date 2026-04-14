@@ -456,7 +456,6 @@ const RequestList = () => {
       <ThemedView style={styles.container}>
       <Spacer height={100} />
 
-      {/* Header */}
       <View style={styles.headerCard}>
         <ThemedText style={styles.heading}>Request Matches</ThemedText>
         <Spacer height={2} />
@@ -465,7 +464,6 @@ const RequestList = () => {
         </ThemedText>
       </View>
 
-      {/* Fake search + filter bar */}
       <View style={styles.searchContainer}>
         <View style={styles.loadingSearchBar} />
         <View style={styles.loadingFilterButton} />
@@ -474,19 +472,17 @@ const RequestList = () => {
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         {[1, 2, 3].map((i) => (
           <View key={i} style={styles.loadingCard}>
-            {/* Header */}
+  
             <View style={styles.loadingLineShort} />
 
             <Spacer height={10} />
 
-            {/* Items list */}
             <View style={styles.loadingLine} />
             <View style={styles.loadingLine} />
             <View style={styles.loadingLineShort} />
 
             <Spacer height={12} />
 
-            {/* Match card inside */}
             <View style={styles.loadingInnerCard}>
               <View style={styles.loadingLineShort} />
               <View style={styles.loadingLine} />

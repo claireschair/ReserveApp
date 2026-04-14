@@ -243,7 +243,6 @@ const Home = () => {
               Personal Statements
             </ThemedText>
         <View style={styles.storyCard}>
-          {/* Why this card have a different color omg - faye*/}
           <ThemedText style={styles.storyText}>
             “Reserve is one step forward in increasing access to school supplies.”
           </ThemedText>

@@ -30,7 +30,6 @@ const Wishlist = () => {
       const auth = getAuth();
       const currentUser = auth.currentUser;
 
-      // Fetch current user's school name from their user doc
       let mySchoolName = null;
       if (currentUser) {
         const userDoc = await getDoc(doc(db, "users", currentUser.uid));
@@ -40,13 +39,10 @@ const Wishlist = () => {
         }
       }
       setCurrentUserSchool(mySchoolName);
-
-      // Get all users
       const usersSnapshot = await getDocs(collection(db, "users"));
 
       const allWishlists = [];
 
-      // For each user, get their school and wishlist subcollection
       await Promise.all(
         usersSnapshot.docs.map(async (userDoc) => {
           const userData = userDoc.data();
@@ -66,7 +62,6 @@ const Wishlist = () => {
         })
       );
 
-      // Shuffle all first, then put same-school teachers at the top
       const shuffled = allWishlists.sort(() => Math.random() - 0.5);
       const sameSchool = shuffled.filter(
         (w) => mySchoolName && w.schoolName === mySchoolName
@@ -93,7 +88,6 @@ const Wishlist = () => {
     }
   };
 
-  // Pagination calculations
   const totalPages = Math.ceil(wishlists.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
@@ -280,7 +274,6 @@ const Wishlist = () => {
               );
             })}
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
               <View style={styles.paginationContainer}>
                 <TouchableOpacity

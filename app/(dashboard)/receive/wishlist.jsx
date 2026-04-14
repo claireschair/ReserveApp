@@ -7,6 +7,7 @@ import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import { useWishlist } from "../../../hooks/useWishlist";
 import { UserContext } from '../../../contexts/UserContext';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 
 const isAmazonLink = (url) => {
   try {
@@ -217,7 +218,8 @@ const Wishlist = () => {
 
           <TouchableOpacity style={styles.button} onPress={handleSubmit}>
             <ThemedText style={styles.buttonText}>
-              {existingWishlist ? "Update Wishlist ✏️" : "Submit Wishlist"}
+              {existingWishlist ? "Update Wishlist  " : "Submit Wishlist"}
+              <FontAwesome5 name="pencil-alt" size={18} color="#ffffff" />
             </ThemedText>
           </TouchableOpacity>
         </View>

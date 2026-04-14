@@ -13,7 +13,7 @@ const VerifyEmail = () => {
   const { email, password } = useLocalSearchParams()
   const { resendVerificationEmail } = useUser()
 
-  const [resendStatus, setResendStatus] = useState(null) // null | 'sending' | 'sent' | 'error'
+  const [resendStatus, setResendStatus] = useState(null) 
   const [cooldown, setCooldown] = useState(false)
 
   const handleResend = async () => {
@@ -22,7 +22,6 @@ const VerifyEmail = () => {
     try {
       const result = await resendVerificationEmail(email, password)
       if (result?.alreadyVerified) {
-        // They've verified in the meantime — send them to login
         router.replace('/login')
         return
       }
@@ -63,7 +62,6 @@ const VerifyEmail = () => {
 
         <Spacer height={30} />
 
-        {/* Primary CTA */}
         <TouchableOpacity
           style={styles.loginButton}
           onPress={() => router.replace('/login')}
@@ -73,7 +71,6 @@ const VerifyEmail = () => {
 
         <Spacer height={14} />
 
-        {/* Resend button */}
         <TouchableOpacity
           style={[styles.resendButton, cooldown && styles.resendButtonDisabled]}
           onPress={handleResend}
