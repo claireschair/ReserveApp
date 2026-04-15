@@ -1,6 +1,6 @@
 # Reserve
 
-**Reserve** is a school supply donation platform that connects donors with nearby schools and teachers in need.
+**Reserve** is a school supply donation platform that connects donors with nearby families and teachers in need.
 
 ---
 
