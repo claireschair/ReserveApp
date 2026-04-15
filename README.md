@@ -6,12 +6,11 @@
 
 ## Features
 
-| Feature | Description |
-| **Request & Donation Forms** | Submit what you need or what you can give — books, stationery, art supplies, and more |
-| **Matching** | Our backend algorithm instantly pairs donors with nearby receivers based on location and supply type |
-| **One-on-One Chat** | Once a match is verified by both parties, a private chat opens to coordinate the transfer |
-| **Donation Centers Map** | Browse and add nearby donation centers for drop-off or pickup |
-| **Amazon Wishlists** | Teachers can link their Amazon wishlists to accept direct donations from supporters |
+**Request & Donation Forms** - Submit what you need or what you can give — books, stationery, art supplies, and more
+**Matching** - Our backend algorithm instantly pairs donors with nearby receivers based on location and supply type
+**One-on-One Chat**Once a match is verified by both parties, a private chat opens to coordinate the transfer
+**Donation Centers Map**Browse and add nearby donation centers for drop-off or pickup
+**Amazon Wishlists**Teachers can link their Amazon wishlists to accept direct donations from supporters
 
 ---
 
