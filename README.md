@@ -33,6 +33,7 @@ Amazon Wishlists - Teachers can link their Amazon wishlists to accept direct don
 - Node.js v18+
 - npm v9+
 - Git
+- Expo Go App (on your phone)
 
 ### Installation
 
